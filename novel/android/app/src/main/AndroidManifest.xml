@@ -1,0 +1,60 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools"
+          package="com.novel">
+
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
+    <application
+            android:name=".MainApplication"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher"
+            android:allowBackup="true"
+            android:theme="@style/AppTheme">
+        <activity
+                android:name=".MainActivity"
+                android:label="@string/app_name"
+                android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+                android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity
+                android:name=".wxapi.WXEntryActivity"
+                android:label="@string/app_name"
+                android:exported="true"
+        />
+        <activity android:name="com.facebook.react.devsupport.DevSettingsActivity"/>
+
+        <!--<meta-data android:value="5a600a268f4a9d15470008d9" android:name="UMENG_APPKEY"/>
+        <meta-data android:value="staging" android:name="UMENG_CHANNEL"/>-->
+        <!--<meta-data android:name="UMENG_CHANNEL" android:value="${UMENG_CHANNEL_VALUE}" />-->
+
+        <meta-data
+                tools:replace="android:value"
+                android:name="android.support.VERSION"
+                android:value="26.1.0"
+        />
+        <provider
+                android:name="android.support.v4.content.FileProvider"
+                android:grantUriPermissions="true"
+                android:exported="false"
+                android:authorities="com.novel.fileprovider"
+        >
+            <meta-data
+                    android:name="android.support.FILE_PROVIDER_PATHS"
+                    android:resource="@xml/file_provider_paths"
+            />
+        </provider>
+    </application>
+
+</manifest>

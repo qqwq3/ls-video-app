@@ -1,0 +1,57 @@
+{
+  "name": "novel",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "node node_modules/react-native/local-cli/cli.js start",
+    "test": "jest"
+  },
+  "dependencies": {
+    "accounting": "^0.4.1",
+    "humps": "^2.0.1",
+    "immutable": "^3.8.2",
+    "loadsh": "^1.0.1",
+    "moment": "^2.22.2",
+    "react": "16.3.0-alpha.1",
+    "react-native": "0.54.4",
+    "react-native-app-metadata": "^1.0.0",
+    "react-native-appupdate": "^1.1.2",
+    "react-native-background-timer": "^2.0.1",
+    "react-native-banner-carousel": "^1.0.3",
+    "react-native-clear-cache": "^1.1.0",
+    "react-native-code-push": "^5.4.0",
+    "react-native-cookie": "^0.2.0",
+    "react-native-device-info": "^0.21.5",
+    "react-native-drawer": "^2.5.0",
+    "react-native-fs": "^2.10.14",
+    "react-native-highlight-words": "^1.0.1",
+    "react-native-image-placeholder": "^1.0.14",
+    "react-native-linear-gradient": "^2.4.0",
+    "react-native-progress": "^3.5.0",
+    "react-native-root-toast": "^3.0.1",
+    "react-native-scrollable-tab-view": "^0.8.0",
+    "react-native-size-matters": "^0.1.1",
+    "react-native-smart-splash-screen": "^2.3.5",
+    "react-native-storage": "^0.2.2",
+    "react-native-swipe-gestures": "^1.0.2",
+    "react-native-switch-pro": "^1.0.0-beta",
+    "react-native-system-setting": "^1.5.0",
+    "react-native-wechat": "^1.9.9",
+    "react-navigation": "^2.5.3",
+    "react-redux": "^5.0.7",
+    "redux": "^4.0.0",
+    "redux-immutable": "^4.0.0",
+    "redux-logger": "^3.0.6",
+    "redux-persist-immutable": "^4.3.1",
+    "redux-thunk": "^2.3.0"
+  },
+  "devDependencies": {
+    "babel-jest": "23.2.0",
+    "babel-preset-react-native": "4.0.0",
+    "jest": "23.2.0",
+    "react-test-renderer": "16.3.0-alpha.1"
+  },
+  "jest": {
+    "preset": "react-native"
+  }
+}
