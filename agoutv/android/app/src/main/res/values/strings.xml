@@ -1,0 +1,4 @@
+<resources>
+    <string moduleConfig="true" name="reactNativeCodePush_androidDeploymentKey">hp2kcDA6ESlZd8xaFjZr4a0LGoVt4ksvOXqog</string>
+    <string name="app_name">超视TV</string>
+</resources>
