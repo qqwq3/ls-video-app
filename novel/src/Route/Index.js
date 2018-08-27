@@ -48,7 +48,7 @@ const TabNavigatorConfigs = {
     // 后退按钮导致标签切换到初始选项卡
     backBehavior: 'initialRoute',
     lazy: true,
-    // 允许在标签之间滑动
+    // 是否允许在标签之间滑动
     swipeEnabled: false,
     // 进入后最开始显示的页面
     initialRouteName: 'Bookshelf',
@@ -117,7 +117,7 @@ const StackNavigatorConfigs = {
     // 全局 - 页面切换 - 动画配置
     transitionConfig: () => ({
         transitionSpec: {
-            duration: 400,
+            duration: 500,
             easing: Easing.out(Easing.poly(4)),
             timing: Animated.timing,
         },
@@ -145,9 +145,13 @@ const StackNavigatorConfigs = {
                 outputRange: [0, 1, 1],
             });
 
-            return { opacity, transform: [{ translateY }] };
+            return { opacity, transform: [{ translateX }] };
         },
     }),
+    // 页面动画过渡完后执行
+    // onTransitionEnd: () => {
+        // console.log('页面的动画过渡完了哦');
+    // }
 };
 
 const Navigator = createStackNavigator(StackRouteConfigs, StackNavigatorConfigs);

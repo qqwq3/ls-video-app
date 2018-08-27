@@ -1,10 +1,12 @@
 'use strict';
 
 import { camelizeKeys } from 'humps';
+import { NetInfo } from 'react-native';
+import Toast from 'react-native-root-toast';
 import { CALL_API } from "./Keys";
 import * as storageApi from '../common/Storage';
 import { makeUserAgent } from "./UserTool";
-import { dictToFormData } from "./Tool";
+import { dictToFormData, infoToast } from "./Tool";
 
 // 拿到设备的一系列信息
 const DeviceInfo = require('react-native-device-info');
@@ -14,8 +16,8 @@ export const HOSTS = {
     API: 'http://api.myfoodexpress.cn',
     UPGRADE: 'http://api.myfoodexpress.cn',
     IMG: 'http://img.bailu8.com/',
-    //API: 'http://192.168.188.140:8080',
-    //UPGRADE: 'http://192.168.188.140:8080',
+    //API: 'http://192.168.188.140:80',
+    //UPGRADE: 'http://192.168.188.140:80',
     //API: 'http://192.168.188.198:8081',
     //UPGRADE: 'http://192.168.188.198:8081',
 };
@@ -42,6 +44,13 @@ export const callApi = async (endpoint, options: Object = {}) => {
 
     // 会话id
     options.headers['SESSION-ID'] = (global.launchSettings && global.launchSettings.sessionId) || DeviceInfo.getUniqueID();
+
+    // 拿到网络状态布尔值
+    let isConnected = await NetInfo.isConnected.fetch();
+
+    if(!isConnected){
+        return infoToast('请检查您的网络', { duration: 2000, position: Toast.positions.CENTER });
+    }
 
     return Promise.race([
         fetch(fullUrl, options),

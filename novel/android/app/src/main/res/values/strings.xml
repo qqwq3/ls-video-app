@@ -1,3 +1,4 @@
 <resources>
+    <string moduleConfig="true" name="reactNativeCodePush_androidDeploymentKey">24c00PNUrEM2pfScI-FiL7SwyltQ0a807393-7289-4bba-ba4a-430561def6a</string>
     <string name="app_name">小说天堂</string>
 </resources>

@@ -1,17 +1,17 @@
 
 'use strict';
 
-import {CALL_API, PAGE_CATALOG, PAGE_CONTROL} from "../common/Keys";
+import {CALL_API, PAGE_CATALOG, PAGE_CONTROL,DOUBLE_PAGE_CATALOG} from "../common/Keys";
 import {Dispatch, GetState, ThunkAction} from "../container/Types";
 
 const _reloadChapterDirectory = (type, bookHex, refreshState, currentOffset): ThunkAction => ({
     params: {
         stateKeys: [type, bookHex, 'directory'],
-        currentOffset: currentOffset + PAGE_CATALOG,
+        currentOffset: currentOffset + DOUBLE_PAGE_CATALOG,
     },
     [CALL_API]: {
         type: 'RELOAD_CATALOG_DIRECTORY_LIST',
-        endpoint: `book/get-chapters-pager?book_id=${bookHex}&limit=${PAGE_CATALOG}&offset=${currentOffset}`,
+        endpoint: `book/get-chapters-pager?book_id=${bookHex}&limit=${DOUBLE_PAGE_CATALOG}&offset=${currentOffset}`,
     },
 });
 
@@ -29,11 +29,11 @@ export const reloadChapterDirectory = (
 const _loadChapterDirectory = (type, bookHex, refreshState, currentOffset): ThunkAction => ({
     params: {
         stateKeys: [type, bookHex, 'directory'],
-        currentOffset: currentOffset + PAGE_CATALOG,
+        currentOffset: currentOffset + DOUBLE_PAGE_CATALOG,
     },
     [CALL_API]: {
         type: 'LOAD_CATALOG_DIRECTORY_LIST',
-        endpoint: `book/get-chapters-pager?book_id=${bookHex}&limit=${PAGE_CATALOG}&offset=${currentOffset}`,
+        endpoint: `book/get-chapters-pager?book_id=${bookHex}&limit=${DOUBLE_PAGE_CATALOG}&offset=${currentOffset}`,
     },
 });
 

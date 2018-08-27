@@ -7,14 +7,16 @@ import Immutable from 'immutable';
 import { connect } from 'react-redux';
 import { withNavigationFocus } from 'react-navigation';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
-import {Styles, ScaledSheet, Img, Fonts, Colors, BackgroundColor} from "../../common/Style";
+import { Styles, ScaledSheet, Img, Fonts, Colors, BackgroundColor } from "../../common/Style";
 import TabBarIcon from '../../components/TabBarIcon';
-import {tab, my, agent} from "../../common/Icons";
+import { tab, my, agent} from "../../common/Icons";
 import Rows from '../../components/Rows';
-import {infoToast, statusBarSet, width} from "../../common/Tool";
-import { VipData,MyData, SubmitApply } from "../../actions/User";
+import { infoToast, statusBarSet, width } from "../../common/Tool";
+import { VipData, MyData, SubmitApply, deleteUserData } from "../../actions/User";
 import BaseComponent from "../../components/BaseComponent";
 import StatusBarSet from '../../components/StatusBarSet';
+import { fineCommonRemove, removeUserSession } from "../../common/Storage";
+import { updateBookshelf } from '../../actions/LocalAction';
 
 type Props = {};
 
@@ -46,6 +48,8 @@ class My extends BaseComponent<Props>{
     componentWillReceiveProps(nextProps) {
         super.componentWillReceiveProps(nextProps);
 
+        this._loginOvertime(nextProps);
+
         // 进入本组件
         if(!this.props.isFocused && nextProps.isFocused){
             this.setState({statusBarBackgroundColor: '#f3916b',statusBarFontColor:'light-content'});
@@ -54,25 +58,52 @@ class My extends BaseComponent<Props>{
                 this.props.MyData && this.props.MyData();
                 this.props.SubmitApply && this.props.SubmitApply();
             }
+
+            this._loginOvertime(nextProps);
         }
 
         // 离开本组件
         if(this.props.isFocused && !nextProps.isFocused){
-            this.setState({statusBarBackgroundColor: '#FFFFFF',statusBarFontColor:'dark-content'});
+            this.setState({statusBarBackgroundColor: '#FFFFFF', statusBarFontColor:'dark-content'});
         }
 
         if(nextProps && nextProps.applyAgentTimeUpdated > this.updateTime && nextProps.messageKeys && nextProps.messageKeys === 'my'){
             this.updateTime = Date.now();
+
             let applyState = parseInt(nextProps.state);
+
             if (applyState === 1) {
                 const { navigation } = nextProps;
-                return navigation && navigation.navigate('AgentHtml',
-                    {agent: {loginStatus : nextProps.loginStatus, agentAdminUrl : nextProps.agentAdminUrl}});
-            }else if (applyState === 2) {
+
+                return navigation && navigation.navigate('AgentHtml', {
+                    agent: {loginStatus : nextProps.loginStatus, agentAdminUrl : nextProps.agentAdminUrl}
+                });
+            }
+            else if (applyState === 2) {
                 return infoToast("您的账号出了点问题，请联系客服");
-            }else if (applyState === 3) {
+            }
+            else if (applyState === 3) {
                 return infoToast("申请中，请耐心等待");
             }
+        }
+    }
+    // 登录超时 - 处理 - function
+    _loginOvertime(nextProps: any | Object){
+        if(nextProps.error && Number(nextProps.error.code) === 401){
+            // 清除用户相关的所有数据
+            this.props.deleteUserData && this.props.deleteUserData();
+
+            // 删除所有书籍的缓存阅读记录
+            fineCommonRemove && fineCommonRemove('allBookCapter');
+
+            // 更新书架
+            this.props.updateBookshelf && this.props.updateBookshelf(true);
+
+            // 清除用户信息 - 本地
+            removeUserSession && removeUserSession();
+
+            // 清除redux相关的缓存
+            global.persistStore && global.persistStore.purge();
         }
     }
     // 书币充值 - function
@@ -92,7 +123,7 @@ class My extends BaseComponent<Props>{
     _renderDay(){
         const { vipDay } = this.props;
 
-        if(vipDay<=3 && vipDay>0 ){
+        if(vipDay <= 3 && vipDay > 0 ){
             return <Text style={{color:'#f3916b'}}>VIP剩余:{vipDay}天</Text>
         }
     }
@@ -115,10 +146,14 @@ class My extends BaseComponent<Props>{
                                     <Image source={my.userDefault} style={[ styles.cardTxImage]}/>
                                 }
                             </View>
-                            <View style={{position:'absolute',bottom:0,right:0,zIndex:1000}}>
+                            <View style={{position:'absolute',right:0,zIndex:1000}}>
                                 { vipDay > 0 ? <Image source={my.vipYellow}/> : <Image source={my.vipGray}/> }
                             </View>
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            activeOpacity={1}
+                            onPress={() => avatar ? {} : this._login()}
+                        >
                         <View style={[ Styles.paddingLeft15, {justifyContent:"center", alignItems:'flex-start'}]}>
                             <Text
                                 numberOfLines={1}
@@ -130,37 +165,38 @@ class My extends BaseComponent<Props>{
                                { this._renderDay() }
                             </View>
                         </View>
+                        </TouchableOpacity>
                     </View>
                     <View style={[styles.cardContent, Styles.marginTop15]}>
-                        <View style={[Styles.flex1]}>
-                            <View style={[Styles.flex1, Styles.flexCenter]}>
-                                <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.gray_808080]}>我的书币</Text>
+                        <View>
+                            <View style={[ Styles.flexCenter]}>
+                                <Text style={[Fonts.fontFamily, Fonts.fontSize14, Colors.gray_404040]}>我的书币</Text>
                             </View>
-                            <View style={[Styles.flex1, Styles.flexCenter]}>
+                            <View style={[ Styles.flexCenter]}>
                                 <Text style={[Fonts.fontFamily, Fonts.fontSize20, Colors.orange_f3916b]}>
                                     { balance ? balance : 0 }
                                 </Text>
                             </View>
                         </View>
                         <View style={[styles.partingLine, Styles.flexCenter]}/>
-                        <View style={[Styles.flex1,Styles.flexCenter,{position:'relative'}]}>
-                            <TouchableOpacity
-                                activeOpacity={0.5}
-                                style={[styles.openButs, Styles.flexCenter, styles.openVipCss, {top: verticalScale(-46)}]}
-                                onPress={this._OpenVip.bind(this)}
-                            >
-                                <Text style={[Fonts.fontFamily, Fonts.fontSize14, Colors.orange_f3916b]}>
-                                    { vipDay > 0 ? '立即续费' : '开通VIP' }
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                activeOpacity={0.5}
-                                style={[styles.openButs, Styles.flexCenter]}
-                                onPress={this._bookMoneyRecharge.bind(this)}
-                            >
-                                <Text style={[Fonts.fontFamily, Fonts.fontSize14, Colors.orange_f3916b]}>书币充值</Text>
-                            </TouchableOpacity>
-                        </View>
+                        {/*<View style={[Styles.flex1,Styles.flexCenter,{position:'relative'}]}>*/}
+                            {/*<TouchableOpacity*/}
+                                {/*activeOpacity={0.5}*/}
+                                {/*style={[styles.openButs, Styles.flexCenter, styles.openVipCss, {top: verticalScale(-46)}]}*/}
+                                {/*onPress={this._OpenVip.bind(this)}*/}
+                            {/*>*/}
+                                {/*<Text style={[Fonts.fontFamily, Fonts.fontSize14, Colors.orange_f3916b]}>*/}
+                                    {/*{ vipDay > 0 ? '立即续费' : '开通VIP' }*/}
+                                {/*</Text>*/}
+                            {/*</TouchableOpacity>*/}
+                            {/*<TouchableOpacity*/}
+                                {/*activeOpacity={0.5}*/}
+                                {/*style={[styles.openButs, Styles.flexCenter]}*/}
+                                {/*onPress={this._bookMoneyRecharge.bind(this)}*/}
+                            {/*>*/}
+                                {/*<Text style={[Fonts.fontFamily, Fonts.fontSize14, Colors.orange_f3916b]}>书币充值</Text>*/}
+                            {/*</TouchableOpacity>*/}
+                        {/*</View>*/}
                     </View>
                 </View>
             </View>
@@ -268,11 +304,11 @@ class My extends BaseComponent<Props>{
             <Rows
                 isClick={false}
                 showLeftTitle={true}
-                leftTitle={'联系客服'}
+                leftTitle={'客服微信'}
                 showBottomBorder={true}
                 isRightConfigure={false}
                 nonConfigRightComponents={
-                    <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.gray_b2b2b2]}>微信：{ agentWechat }</Text>
+                    <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.gray_b2b2b2]}>{ agentWechat }</Text>
                 }
             />
         );
@@ -283,11 +319,11 @@ class My extends BaseComponent<Props>{
             <Rows
                 isClick={false}
                 showLeftTitle={true}
-                leftTitle={'交流群'}
+                leftTitle={'客服QQ'}
                 showBottomBorder={false}
                 isRightConfigure={false}
                 nonConfigRightComponents={
-                    <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.gray_b2b2b2]}>QQ：604930141</Text>
+                    <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.gray_b2b2b2]}>604930141</Text>
                 }
             />
         );
@@ -356,10 +392,11 @@ class My extends BaseComponent<Props>{
     renderContent(){
         return (
             <View style={[styles.content]}>
-                { this.renderMyAgent() }
+                {/*{ this.renderMyAgent() }*/}
                 { this.renderMyComments() }
                 { this.renderISee() }
                 { this.renderMySetting() }
+                { this.renderLine() }
                 { this.renderOpinionFeedback() }
                 { this.renderLine() }
                 { this.renderContactCustomerService() }
@@ -445,9 +482,10 @@ const styles = ScaledSheet.create({
         flexDirection: 'row',
     },
     cardContent: {
+        display:'flex',
         flexDirection: 'row',
         overflow:'hidden',
-        flex: 1,
+        marginLeft:'70@ms',
     },
     partingLine: {
         width: '0.5@s',
@@ -467,6 +505,9 @@ const styles = ScaledSheet.create({
         paddingBottom: '10@ms',
     },
     card: {
+        display:'flex',
+        flexDirection: 'row',
+        alignItems:'center',
         height: '160@vs',
         backgroundColor: BackgroundColor.bg_fff,
         elevation: '4@ms',
@@ -509,7 +550,13 @@ const mapStateToProps = (state, ownProps) => {
     return { ...ownProps, ...userData, ...baseInfo, ...agentInfo };
 };
 
-export default withNavigationFocus(connect(mapStateToProps,{VipData,MyData,SubmitApply})(My));
+export default withNavigationFocus(connect(mapStateToProps,{
+    VipData,
+    MyData,
+    SubmitApply,
+    deleteUserData,
+    updateBookshelf
+})(My));
 
 
 

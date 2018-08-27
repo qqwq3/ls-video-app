@@ -54,7 +54,7 @@ const mix = {
     weChat: require('../images/mix/btn_icon_wechat.png'),
     login: require('../images/mix/img_login.png'),
     addBook: require('../images/mix/icon_add_book.png'),
-
+    ruleClose: require('../images/mix/icon_rule_close.png'),
 };
 
 const def = {
@@ -63,7 +63,9 @@ const def = {
 };
 
 const bookshelf = {
-    select: require('../images/bookshelf/book_select.png')
+    select: require('../images/bookshelf/book_select.png'),
+    popup:require('../images/bookshelf/popup_guide_to_signin.png'),
+    close:require('../images/bookshelf/icon_close.png')
 };
 
 const bookCity = {

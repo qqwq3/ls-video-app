@@ -32,7 +32,7 @@ type Props = {
     stylesHeaderPosition?: Object,
 };
 
-const commonMarginTop = StatusBar.currentHeight;
+const commonTop = StatusBar.currentHeight;
 
 class Header extends PureComponent<Props>{
     static defaultProps = {
@@ -126,7 +126,7 @@ class Header extends PureComponent<Props>{
             <View style={[
                 styles.headerContent,
                 stylesHeaderPosition,
-                { borderBottomColor, backgroundColor: headerBackgroundColor, marginTop: commonMarginTop }
+                { borderBottomColor, backgroundColor: headerBackgroundColor }
             ]}>
                 { this.renderStatusBar() }
                 { !isArrow ? null : this.renderArrow() }
@@ -142,12 +142,15 @@ const styles = ScaledSheet.create({
     titleRows: {
         width: '100%',
         left: 0,
-        top: 0,
+        // top: 0,
+        top: moderateScale(5),
         zIndex: 1,
         position: 'absolute',
     },
     titleRight: {
-        height: '44@vs',
+        // height: '44@vs',
+        height: verticalScale(44 + commonTop),
+        paddingTop: moderateScale(5),
         position: 'absolute',
         top: 0,
         right: 0,
@@ -155,7 +158,9 @@ const styles = ScaledSheet.create({
         zIndex: 100
     },
     demo: {
-        height: '44@vs',
+        // height: '44@vs',
+        height: verticalScale(44 + commonTop),
+        paddingTop: moderateScale(5),
     },
     demoRight: {
         flexDirection: 'row',
@@ -165,7 +170,9 @@ const styles = ScaledSheet.create({
         alignItems: 'center',
     },
     arrow: {
-        height: '44@vs',
+        // height: '44@vs',
+        height: verticalScale(44 + commonTop),
+        paddingTop: moderateScale(5),
         width: '100@s',
         flexDirection: 'row',
         alignItems: 'center',
@@ -177,9 +184,11 @@ const styles = ScaledSheet.create({
         height: '18@ms',
     },
     headerContent: {
-        height: '44@vs',
+        // height: '44@vs',
+        height: verticalScale(44 + commonTop),
+        paddingTop: moderateScale(5),
         position: 'relative',
-        borderBottomWidth: 1 / pixel,
+        borderBottomWidth: moderateScale(1 / pixel),
         borderBottomColor: 'transparent',
         width: '100%',
         flexDirection: 'row',

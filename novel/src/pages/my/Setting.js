@@ -2,7 +2,7 @@
 'use strict';
 
 import React, { Component } from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import {View, Text, TouchableOpacity, Alert, BackHandler} from 'react-native';
 import Immutable from 'immutable';
 import { connect } from 'react-redux';
 import { scale, verticalScale } from 'react-native-size-matters';
@@ -16,6 +16,7 @@ import { infoToast, setAppBrightness } from "../../common/Tool";
 import { updateBookshelf } from '../../actions/LocalAction';
 import { commonSave, commonLoad } from "../../common/Storage";
 import { VERSION } from "../../common/Keys";
+import Dialog from '../../components/Dialog';
 
 type Props = {};
 
@@ -64,8 +65,8 @@ class Setting extends Component<Props>{
     _getApplicationCache(){
         clear.getCacheSize((value,unit)=>{
             this.setState({
-                cacheSize: value, //缓存大小
-                unit: unit  //缓存单位
+                cacheSize: value, // 缓存大小
+                unit: unit  // 缓存单位
             })
         });
     }
@@ -76,6 +77,35 @@ class Setting extends Component<Props>{
             this._getApplicationCache();
         });
     }
+    // 清除缓存 - 确定 - function
+    onDismissExit(){
+        this._clearApplicationCache();
+        this.popExitRef && this.popExitRef.modeHide();
+    }
+    // 清除缓存 - 取消 - function
+    onConfirmExit(){
+        this.popExitRef && this.popExitRef.modeHide();
+    }
+    // 清除缓存提示 - demo
+    renderClearCachePrompt(){
+        return (
+            <Dialog
+                popHeight={verticalScale(180)}
+                ref={ref => this.popExitRef = ref}
+                animationType={'slide'}
+                title={'系统提示'}
+                buttonLeftText={'确定'}
+                buttonRightText={'取消'}
+                mandatory={true}
+                onDismiss={this.onDismissExit.bind(this)}
+                onConfirm={this.onConfirmExit.bind(this)}
+            >
+                <View style={[Styles.flexCenter, Styles.flex1]}>
+                    <Text style={[Fonts.fontSize15, Fonts.fontFamily, Colors.gray_404040]}>确定要清除APP当前应用缓存吗？</Text>
+                </View>
+            </Dialog>
+        );
+    }
     // 清除app应用缓存
     _clearCache(){
         const { cacheSize } = this.state;
@@ -84,10 +114,12 @@ class Setting extends Component<Props>{
             return infoToast && infoToast('暂无应用缓存');
         }
 
-        Alert.alert('系统提示','确定要清除APP当前应用缓存吗？',[
-            { text: '取消', onPress: () => {} },
-            { text: '确定', onPress: () => this._clearApplicationCache() }
-        ]);
+        // Alert.alert('系统提示','确定要清除APP当前应用缓存吗？',[
+        //     { text: '取消', onPress: () => {} },
+        //     { text: '确定', onPress: () => this._clearApplicationCache() }
+        // ]);
+
+        this.popExitRef && this.popExitRef.modeShow();
     }
     // 返回 - function
     _goBack(){
@@ -217,6 +249,7 @@ class Setting extends Component<Props>{
                 { this.renderLine() }
                 { this.renderCurrentAppVersion() }
                 { this.renderButton() }
+                { this.renderClearCachePrompt() }
             </View>
         );
     }

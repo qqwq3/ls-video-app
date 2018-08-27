@@ -41,8 +41,8 @@ export async function makeUserAgent() {
     const info = await NetInfo.getConnectionInfo();
 
     return '(Linux; ' +
-        DeviceInfo.getSystemName() + ' ' + DeviceInfo.getSystemVersion() + '; ' +
-        DeviceInfo.getModel() + ') GoApp/' + DeviceInfo.getVersion() + ' NetType/' + info.type + ' Language/zh_CN)';
+        DeviceInfo.getSystemName() + ' ' + DeviceInfo.getSystemVersion() + '; ' + //DeviceInfo.getModel() +  (有中文会报错)
+        ' GoApp/' + DeviceInfo.getVersion() + ' NetType/' + info.type + ' Language/' + DeviceInfo.getDeviceLocale() + ')';
 }
 
 

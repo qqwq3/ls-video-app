@@ -14,16 +14,20 @@ import { checkUpgrade } from "./Api";
 export default class BinaryUpgrader {
     check(onStatusChanged, onProgress) {
         onStatusChanged && onStatusChanged(CodePush.SyncStatus.CHECKING_FOR_UPDATE);
-        return Platform.OS == 'android' ? this._checkAndroid(onStatusChanged, onProgress) : this._checkiOS(onStatusChanged, onProgress);
+        return Platform.OS === 'android' ? this._checkAndroid(onStatusChanged, onProgress) : this._checkiOS(onStatusChanged, onProgress);
     }
 
     _checkAndroid(onStatusChanged, onProgress) {
-        let updateJsonUrl = global.launchSettings && global.launchSettings.agentData && global.launchSettings.agentData.data &&
-            global.launchSettings.agentData.data.updateJson;
+        let updateJsonUrl = global.launchSettings
+            && global.launchSettings.agentData
+            && global.launchSettings.agentData.data
+            && global.launchSettings.agentData.data.updateJson;
+
         if (!updateJsonUrl) {
             // 不需要更新
             onStatusChanged && onStatusChanged(CodePush.SyncStatus.UP_TO_DATE);
         }
+
         const upgrader = new AppUpdate({
             apkVersionUrl: updateJsonUrl,
             needUpdateApp: (needUpdate) => {
@@ -62,6 +66,7 @@ export default class BinaryUpgrader {
     async _checkiOS(onStatusChanged, onProgress) {
         onStatusChanged && onStatusChanged(CodePush.SyncStatus.CHECKING_FOR_UPDATE);
         let result = await checkUpgrade('ios');
+
         if (result && result.code === 0 && result.data.versionName > BINARY_VERSION) {
             onStatusChanged && onStatusChanged(CodePush.SyncStatus.AWAITING_USER_ACTION);
             let buttons = [
@@ -79,7 +84,8 @@ export default class BinaryUpgrader {
 
             Alert.alert('升级提示', '新版本可用，您想现在升级吗？', buttons, { cancelable: false });
 
-        } else {
+        }
+        else {
             onStatusChanged && onStatusChanged(CodePush.SyncStatus.UP_TO_DATE);
         }
     }

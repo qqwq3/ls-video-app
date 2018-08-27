@@ -90,6 +90,13 @@ const classification = (state = initialState, action: Action) => {
                         records: records.toJS(),
                     };
                 });
+
+            // 清空搜索 - 成功
+            case 'CLEAN_CATEGORY_SEARCH_LIST':
+                return state.setIn(action.params.stateKeys,{
+                    records: [],
+                    updateTime: Date.now(),
+                });
         }
 
         // 列表类单独的处理

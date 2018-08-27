@@ -5,11 +5,12 @@ import { View, Image, TouchableOpacity,  Dimensions, StatusBar } from 'react-nat
 import { connect } from 'react-redux';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import Immutable from 'immutable';
-import {agent} from "../../common/Icons";
+import {agent, arrow} from "../../common/Icons";
 import Header from '../../components/Header';
-import { infoToast } from "../../common/Tool";
+import {infoToast, setStatusBar} from "../../common/Tool";
 import { SubmitApply } from "../../actions/User";
 import BaseComponent from "../../components/BaseComponent";
+import {BackgroundColor,ScaledSheet} from "../../common/Style";
 
 type Props = {};
 
@@ -21,6 +22,12 @@ class Applyagent extends BaseComponent<Props>{
         };
         this.updateTime = Date.now();
         this.errorTime = Date.now();
+    }
+    componentWillMount(){
+        setStatusBar && setStatusBar(BackgroundColor.bg_transparent, false,'light-content');
+    }
+    componentWillUnmount() {
+        setStatusBar && setStatusBar(BackgroundColor.bg_fff, false,'dark-content');
     }
     componentWillReceiveProps(nextProps){
         super.componentWillReceiveProps(nextProps);
@@ -50,22 +57,27 @@ class Applyagent extends BaseComponent<Props>{
     }
     renderHeader(){
         return (
-            <Header
-                title={'申请代理'}
-                isArrow={true}
-                goBack={this._goBack.bind(this)}
-            />
+            <View style={{position:'absolute',top:moderateScale(30),left:moderateScale(15),zIndex:10}}>
+                <TouchableOpacity
+                    activeOpacity={0.75}
+                    onPress={this._goBack.bind(this)}
+                >
+                    <View style={{width:scale(50),height:verticalScale(25)}}>
+                        <Image source={arrow.leftWhite}/>
+                    </View>
+                </TouchableOpacity>
+            </View>
         );
     }
 
     render(){
         const ScreenWidth = Dimensions.get('window').width;
         return (
-            <View>
+            <View style={{position:'relative'}}>
                 {this.renderHeader()}
-                <View style={{position:'relative',width:ScreenWidth,height:'96%'}}>
+                <View style={{width:ScreenWidth,height:'100%'}}>
 
-                        <Image source={agent.applybg} resizeMode={'stretch'} style={{width:ScreenWidth,height:'93%'}}/>
+                        <Image source={agent.applybg} resizeMode={'stretch'} style={{width:ScreenWidth,height:'100%'}}/>
 
                     <View style={{alignItems:'center'}}>
                             <View style={{position:'absolute',bottom:moderateScale(20),width:scale(300),height:verticalScale(60)}}>

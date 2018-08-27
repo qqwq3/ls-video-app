@@ -5,11 +5,13 @@ import { createStore, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
 import { persistStore, autoRehydrate } from 'redux-persist-immutable';
 import { AsyncStorage } from 'react-native';
+// import { createNetworkMiddleware } from 'react-native-offline';
 import Storage from 'react-native-storage';
 import rootReducer from '../reducers/Index';
 import apiStorage from '../common/ApiStorage';
 import api from '../common/Api';
 
+// const networkMiddleware = createNetworkMiddleware();
 const createStoryStore = applyMiddleware(thunk, api, apiStorage)(createStore);
 
 // 是否在chrome中调试

@@ -94,5 +94,16 @@ export const loadSearch = (bookName: string, refreshState, currentOffset: string
     return dispatch(_loadSearch(bookName, refreshState, currentOffset));
 };
 
+const _cleanSearch = (): ThunkAction => ({
+    params: {
+        stateKeys: ['search']
+    },
+    type: 'CLEAN_CATEGORY_SEARCH_LIST',
+});
+
+// 搜索数据 - 清空
+export const cleanSearch = () => (dispatch: Dispatch, getState: GetState) => {
+    return dispatch(_cleanSearch());
+};
 
 

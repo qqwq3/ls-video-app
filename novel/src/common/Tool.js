@@ -6,16 +6,49 @@
 import { Dimensions, PixelRatio, NetInfo, StatusBar, Platform, Animated, Easing } from 'react-native';
 import _ from 'loadsh';
 import Immutable from 'immutable';
+import accounting from 'accounting';
+import CodePush from 'react-native-code-push';
 import Toast from 'react-native-root-toast';
 import SystemSetting from 'react-native-system-setting';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { HOSTS } from '../common/Api';
 
-
 // 阅读模式控制
 export const setAppBrightness = (value: number) => {
     SystemSetting && SystemSetting.setAppBrightness(value);
 };
+
+// 热更新配置
+export  function codePushDialogConfig(deploymentKey){
+
+    // console.log(deploymentKey);
+
+    return {
+        // 部署key
+        // deploymentKey: deploymentKey,
+        // 启动模式三种：ON_NEXT_RESUME:当应用从后台返回时、ON_NEXT_RESTART:下一次启动应用时、IMMEDIATE:立即更新
+        installMode: CodePush.InstallMode.IMMEDIATE,
+        // 升级弹出层
+        updateDialog: {
+            // 是否显示更新description，默认为false
+            appendReleaseDescription: true,
+            // 更新说明的前缀。 默认是” Description:
+            descriptionPrefix:"更新内容：",
+            // 强制更新的按钮文字，默认为continue
+            mandatoryContinueButtonLabel:"立即更新",
+            // 强制更新时，更新通知
+            mandatoryUpdateMessage:"重要更新，请务必安装",
+            // 非强制更新时，取消按钮文字,默认是ignore
+            optionalIgnoreButtonLabel: '忽略',
+            // 非强制更新时，确认文字
+            optionalInstallButtonLabel: '更新',
+            // 非强制更新时，更新通知
+            optionalUpdateMessage: '有新版本了，是否更新？',
+            // 要显示的更新通知的标题
+            title: '更新提示'
+        },
+    };
+}
 
 // 刷新机制 - 配置
 export const RefreshState: Object = {
@@ -117,6 +150,17 @@ export function timestampToTime(timestamp: number | string, showTime: boolean = 
     return Y + M + D + h + m + s;
 }
 
+// 得到当天的时间( HH : MM )
+export function currentDayDate(){
+    let now  = new Date();
+    // 得到小时
+    let hours = now.getHours() < 10 ? ('0' + now.getHours()) : now.getHours();
+    // 得到分钟
+    let minutes = now.getMinutes() < 10 ? ('0' + now.getMinutes()) : now.getMinutes();
+
+    return hours + ':' + minutes;
+}
+
 // 时间比较
 export function compareDate(d1, d2) {
     return ((new Date(d1.replace(/-/g,"\/"))) > (new Date(d2.replace(/-/g,"\/"))));
@@ -177,6 +221,11 @@ export const zeroPadding = (value: number | string): string => {
 // 公共提示
 export const infoToast = (message: string, obj: Object = { duration: 3000, position: verticalScale(-55) }) => {
     return Toast && Toast.show(message, obj);
+};
+
+// 关闭公共提示
+export const closeInfoToast = (toast) => {
+    return Toast && Toast.hide(toast);
 };
 
 // 设置状态栏设置
@@ -249,13 +298,32 @@ export function dictToFormData(data: any) {
  * @number
  * @returns {number}
  **/
-export function numberConversion(nums?: string | number): string | number{
-    let res;
-    let n = String(nums);
-    let m = Number(nums);
+export function numberConversion(num?: string | number): string | number{
+    let res: number = 0;
+    let n: string = String(num);
 
-    if(n.length >= 5){
-        res = (m / Math.pow(10,4)).toFixed(2) + '万';
+    n = n.replace(/\s+/g, "");
+
+    let m = Number(n);
+    let _m = Number(n) / Math.pow(10, n.length - 1);
+
+    if(n.length === 4){
+        res = accounting.toFixed(_m, 2) + '千';
+    }
+    else if(n.length === 5){
+        res = accounting.toFixed(_m, 2) + '万';
+    }
+    else if(n.length === 6){
+        res = accounting.toFixed(Number(_m) * Math.pow(10, 1), 2) + '万';
+    }
+    else if(n.length === 7){
+        res = accounting.toFixed(Number(_m) * Math.pow(10, 2), 2) + '万';
+    }
+    else if(n.length === 8){
+        res = accounting.toFixed(Number(_m) * Math.pow(10, 3), 2) + '万';
+    }
+    else if(n.length === 9){
+        res = accounting.toFixed(Number(_m) * Math.pow(10, 4), 2) + '万';
     }
     else{
         res = m;

@@ -24,6 +24,7 @@ import {
     likeComments, checkIsAddBookshelf,
     cancelAddBookshelf
 } from '../../actions/Details';
+import { fineCommonRemoveSingle } from "../../common/Storage";
 
 type Props = {};
 
@@ -37,7 +38,11 @@ class Details extends BaseComponent<Props> {
             MaxHeight: 0,
             isShow: false,
             commentsMap: new Map(),
-            addBookshelfStatus: false
+            addBookshelfStatus: false,
+            bookTitle:'',
+            bookDescribe:'',
+            hexId:'',
+            bookId:''
         };
         this.icons = {
             'up': arrow.top,
@@ -49,11 +54,20 @@ class Details extends BaseComponent<Props> {
         this.cancelSuccessAddTime = Date.now();
     }
     componentDidMount() {
-        const { navigation } = this.props;
+        const { navigation,detail } = this.props;
+        const data = detail ? detail.data : false;
         const bookHexId = navigation.getParam('hexId');
         const bookId = navigation.getParam('bookId');
+        const description = data ? data.description : false;
+        const Description = description ? (/<br\s*\/?>/gi.test(description) ? description.replace(/<br\s*\/?>/gi,"\r\n") : description) : '';
 
         this._refreshCurrentData(bookId, bookHexId, false);
+        this.setState({
+            bookTitle: data ? data.title : '',
+            bookDescribe: Description,
+            hexId:bookHexId,
+            bookId:bookId,
+        });
     }
     componentWillReceiveProps(nextProps) {
         super.componentWillReceiveProps(nextProps.user);
@@ -125,11 +139,12 @@ class Details extends BaseComponent<Props> {
     renderBooks() {
         const { detail } = this.props;
         const data = detail ? detail.data : false;
+        const uri = data && loadImage(data.id);
 
         return (
             <View style={[{backgroundColor: BackgroundColor.bg_fff}]}>
                 <View style={[styles.BookMarkBox, Styles.paddingVertical15]}>
-                    { data ? <Books source={{uri: data.cover}} clickAble={false} size={'large'}/> : <Books clickAble={false} size={'large'}/> }
+                    { data ? <Books source={{uri: uri}} clickAble={false} size={'large'}/> : <Books clickAble={false} size={'large'}/> }
                     <View style={[styles.BookMarkMassage]}>
                         <Text
                             style={[styles.BookMarkTitle, Fonts.fontFamily, Fonts.fontSize15, Colors.gray_404040]}
@@ -204,7 +219,7 @@ class Details extends BaseComponent<Props> {
                 contentText={item.content}
                 commentTime={timestampToTime(item.timeCreated, true)}
                 pointPraise={likeCount}
-                //ImageSource={{uri: loadImage(item.userId)}}
+                // ImageSource={{uri: loadImage(item.userId)}}
                 ImageSource={item.avatar === '' ? my.userDefault : {uri: item.avatar}}
                 pointPraiseOnPress={this._pointPraiseOnPress.bind(this, item.id, item.likeCount)}
             />
@@ -445,7 +460,7 @@ class Details extends BaseComponent<Props> {
     // 更新 - function
     updateCatalog(item) {
         const { navigation, hashId } = this.props;
-        const hexId = item.latestChapter && item.latestChapter.hexId;
+        const chapterHexId = item.latestChapter && item.latestChapter.hexId;
         const bookId = item.id;
         const bookHexId = item.hexId;
 
@@ -453,7 +468,15 @@ class Details extends BaseComponent<Props> {
         // const vipChapterIndex = item.vipChapterIndex;
         // const value = parseInt(sourceSiteIndex) >= parseInt(vipChapterIndex) ? '1' : '0';
 
-        navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: false});
+        // navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: false});
+
+        fineCommonRemoveSingle && fineCommonRemoveSingle('allBookCapter', bookHexId + 'currentChapter');
+
+        navigation && navigation.navigate('Reader',{
+            chapterHexId,
+            bookHexId,
+            bookId
+        });
     }
     // 加入 or 取消 - 书架 -function
     _AddBookshelf() {
@@ -555,12 +578,19 @@ class Details extends BaseComponent<Props> {
         const hexId = data ? data.hexId : '';
         const bookId = data ? data.id : '';
         const bookHexId = hexId;
+        const chapterHexId = `book_id${hexId}`;
 
         // const sourceSiteIndex = data ? data.latestChapter.sourceSiteIndex : 0;
         // const vipChapterIndex = data ? data.vipChapterIndex : 0;
         // const value = parseInt(sourceSiteIndex) >= parseInt(vipChapterIndex) ? '1' : '0';
 
-        navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: true});
+        // navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: true});
+
+        navigation && navigation.navigate('Reader',{
+            chapterHexId,
+            bookHexId,
+            bookId
+        });
     }
     // 关闭分享面板 - function
     _sharePanelCancel(){
@@ -568,28 +598,43 @@ class Details extends BaseComponent<Props> {
     }
     // 分享 - function
     _share(){
+        const { navigation,detail } = this.props;
+        const data = detail ? detail.data : false;
+        const bookHexId = navigation.getParam('hexId');
+        const description = data ? data.description : false;
+        const Description = description ? (/<br\s*\/?>/gi.test(description) ? description.replace(/<br\s*\/?>/gi,"\r\n") : description) : '';
+
+        this.setState({
+            bookTitle: data ? data.title : '',
+            bookDescribe: Description,
+            hexId:bookHexId,
+        });
         this.refs['drawer'] && this.refs['drawer'].openControlPanel();
     }
     // 分享朋友 - function
     _shareFriends(){
+        const title=this.state.bookTitle ? this.state.bookTitle : '小说天堂'
         const shareUrl = global.launchSettings && global.launchSettings.agentData && global.launchSettings.agentData.data &&
             global.launchSettings.agentData.data.shareUrl || 'http://share.lameixisi.cn/share/index.html';
         const agentTag = (global.launchSettings && global.launchSettings.agentTag) || '10';
         const channelID = global.launchSettings && global.launchSettings.channelID;
+        const link = `http://weixin.myfoodexpress.cn/book-page?id=book_id${this.state.hexId}`;
 
         shareRemoveListener && shareRemoveListener();
-        commonShare && commonShare('friends', channelID, shareUrl, agentTag);
+        commonShare && commonShare('friends', channelID, shareUrl, agentTag,title, this.state.bookDescribe,link);
         shareAddListener && shareAddListener();
     }
     // 分享朋友圈 - function
     _shareFriendsCircle(){
+        const title=this.state.bookTitle ? this.state.bookTitle : '小说天堂'
         const shareUrl = global.launchSettings && global.launchSettings.agentData && global.launchSettings.agentData.data &&
             global.launchSettings.agentData.data.shareUrl || 'http://share.lameixisi.cn/share/index.html';
         const agentTag = (global.launchSettings && global.launchSettings.agentTag) || '10';
         const channelID = global.launchSettings && global.launchSettings.channelID;
+        const link = `http://weixin.myfoodexpress.cn/book-page?id=book_id${this.state.hexId}`;
 
         shareRemoveListener && shareRemoveListener();
-        commonShare && commonShare('friendsCircle', channelID, shareUrl, agentTag);
+        commonShare && commonShare('friendsCircle', channelID, shareUrl, agentTag,title,this.state.bookDescribe,link);
         shareAddListener && shareAddListener();
     }
     render() {
@@ -748,6 +793,7 @@ const styles = ScaledSheet.create({
         position: 'relative'
     },
     titleRightChildren: {
+        // paddingTop: moderateScale(6),
         height: '100%',
         width: '100@s',
         flexDirection: 'row',

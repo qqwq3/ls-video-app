@@ -37,7 +37,6 @@ const _loadScopeAndState = (): ThunkAction => ({
     },
 });
 
-
 const _logout = (): ThunkAction => ({
     params: {
         stateKeys: ['userData'],
@@ -56,7 +55,6 @@ const _logout = (): ThunkAction => ({
 export const logout = () => (dispatch: Dispatch, getState: GetState) => {
     return dispatch(_logout());
 };
-
 
 // 获取微信登录的scope和state
 export const loadScopeAndState = () => (dispatch: Dispatch, getState: GetState) => {
@@ -97,8 +95,7 @@ export const userSignIn = () => (dispatch: Dispatch, getState: GetState) => {
     return dispatch(_userSignIn());
 };
 
-
-//开通VIP
+// 开通VIP
 const _localVipData = (): ThunkAction => ({
     params: {
         stateKeys: ['userData','openVip'],
@@ -117,7 +114,7 @@ export const VipData = () => (dispatch: Dispatch, getState: GetState) => {
     return dispatch(_localVipData());
 };
 
-//我的信息
+// 我的信息
 const _localMyData = (): ThunkAction => ({
     params: {
         stateKeys: ['userData','myData'],
@@ -156,7 +153,7 @@ export const ChargeCode = (agentId: string | number, code:string) => (dispatch: 
     return dispatch(_chargeCode(agentId, code));
 };
 
-//申请代理
+// 申请代理
 const _localApplyAgent = (page:any): ThunkAction => ({
     params: {
         messageKeys:page,
@@ -176,7 +173,7 @@ export const SubmitApply = (page:any) => (dispatch: Dispatch, getState: GetState
     return dispatch(_localApplyAgent(page));
 };
 
-//发送验证码
+// 发送验证码
 const _localSendVercode = (mobile): ThunkAction => ({
     params: {
         stateKeys: ['userData','sendVercode'],
@@ -197,7 +194,7 @@ export const SendVercode = (mobile: number ) => (dispatch: Dispatch, getState: G
     return dispatch(_localSendVercode(mobile));
 };
 
-//代理验证
+// 代理验证
 const _localApplyText = (mobile,vcode): ThunkAction => ({
     params: {
         stateKeys: ['userData','applyText'],
@@ -217,6 +214,7 @@ const _localApplyText = (mobile,vcode): ThunkAction => ({
 export const ApplyText = (mobile: number ,vcode :number) => (dispatch: Dispatch, getState: GetState) => {
     return dispatch(_localApplyText(mobile,vcode));
 };
+
 // 下拉-刷新最新数据
 const _reloadMyComments = (refreshState, currentOffset): ThunkAction => ({
     params: {
@@ -229,13 +227,15 @@ const _reloadMyComments = (refreshState, currentOffset): ThunkAction => ({
         refreshState: refreshState
     },
 });
+
 export const reloadMyComments = (
     refreshState: number | string,
     currentOffset: number = 0,
 ) => (dispatch: Dispatch, getState: GetState) => {
     return dispatch(_reloadMyComments(refreshState, currentOffset));
 };
-//上拉加载更多
+
+// 上拉加载更多
 const _loadMyComments = (refreshState, currentOffset): ThunkAction => ({
     params: {
         stateKeys: ['userData','commentsData'],
@@ -247,6 +247,7 @@ const _loadMyComments = (refreshState, currentOffset): ThunkAction => ({
         refreshState: refreshState
     },
 });
+
 export const loadMyComments = (
     refreshState: number | string,
     currentOffset: number = 0,
@@ -254,8 +255,6 @@ export const loadMyComments = (
     return dispatch(_loadMyComments(refreshState, currentOffset));
 };
 
-
-//浏览历史记录 book/get-book-reads
 // 下拉-刷新最新数据
 const _reloadHistorical = (refreshState, currentOffset): ThunkAction => ({
     params: {
@@ -268,13 +267,15 @@ const _reloadHistorical = (refreshState, currentOffset): ThunkAction => ({
         refreshState: refreshState
     },
 });
+
 export const reloadHistorical = (
     refreshState: number | string,
     currentOffset: number = 0,
 ) => (dispatch: Dispatch, getState: GetState) => {
     return dispatch(_reloadHistorical(refreshState, currentOffset));
 };
-//上拉加载更多
+
+// 上拉加载更多
 const _loadHistorical = (refreshState, currentOffset): ThunkAction => ({
     params: {
         stateKeys: ['userData','historicalData'],
@@ -286,9 +287,24 @@ const _loadHistorical = (refreshState, currentOffset): ThunkAction => ({
         refreshState: refreshState
     },
 });
+
 export const loadHistorical = (
     refreshState: number | string,
     currentOffset: number = 0,
 ) => (dispatch: Dispatch, getState: GetState) => {
     return dispatch(_loadHistorical(refreshState, currentOffset));
 };
+
+const _deleteUserData = (): ThunkAction => ({
+    params: {
+        stateKeys: ['userData'],
+    },
+    type: 'DELETE_USER_DATA',
+});
+
+// 删除我的信息 - 本地props记录
+export const deleteUserData = () => (dispatch: Dispatch, getState: GetState) => {
+    return dispatch(_deleteUserData());
+};
+
+

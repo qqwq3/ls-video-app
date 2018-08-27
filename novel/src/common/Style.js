@@ -159,7 +159,7 @@ const Colors = ScaledSheet.create({
     },
     white_FFF: {
         color: '#FFF'
-    },
+    }
 });
 
 const Img = ScaledSheet.create({
@@ -189,7 +189,6 @@ const BackgroundColor = {
 };
 
 export { Styles, ScaledSheet, Fonts, Colors, Img, BackgroundColor };
-
 
 // Valid keys: [
 //     "display",

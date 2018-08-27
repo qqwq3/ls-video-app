@@ -2,21 +2,22 @@
 'use strict';
 
 import React, { Component } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View, Platform } from 'react-native';
 import SplashScreen from 'react-native-smart-splash-screen';
+// import { withNetworkConnectivity } from 'react-native-offline';
 import * as Progress from 'react-native-progress';
 import CodePush from "react-native-code-push";
 import AppMetadata from 'react-native-app-metadata'
 import { Provider } from 'react-redux';
-import { consoleDestroy, setStatusBar, setAppBrightness } from "./src/common/Tool";
+import { consoleDestroy, setStatusBar, setAppBrightness, codePushDialogConfig } from "./src/common/Tool";
 import { ScaledSheet, BackgroundColor } from './src/common/Style';
 import Router from './src/Route/Index';
 import configureStore from './src/store/Index';
-import { VERSION } from "./src/common/Keys";
+import { VERSION, DEPLOYMENT_KEYS } from "./src/common/Keys";
 import * as api from './src/common/Api';
-import { sex } from "./src/common/Icons";
 import BinaryUpgrader from './src/common/BinaryUpgrader';
-import { commonLoad } from "./src/common/Storage";
+import { commonLoad, removeUserSession } from "./src/common/Storage";
+import StatusBarSet from './src/components/StatusBarSet';
 
 type Props = {};
 
@@ -28,16 +29,6 @@ class App extends Component<Props> {
             tipText: '当前版本：' + VERSION,
             store: configureStore(() => { this.initialization() }),
         };
-        this.sexArr = [
-            {
-                image: sex.boy,
-                name: '男生小说'
-            },
-            {
-                image: sex.girl,
-                name: '女生小说'
-            }
-        ];
         this.codePushDownloadDidProgress = this.codePushDownloadDidProgress.bind(this);
         this.codePushStatusDidChange = this.codePushStatusDidChange.bind(this);
         this.binaryPushStatusDidChange = this.binaryPushStatusDidChange.bind(this);
@@ -50,22 +41,35 @@ class App extends Component<Props> {
         setStatusBar && setStatusBar('#FFFFFF',true);
 
         // 设置日间或者夜间模式
-        this.modeAutoChange();
+        // this.modeAutoChange();
     }
     // 设置日间或者夜间模式 - function
     async modeAutoChange(){
         let mode = await commonLoad('modeChange');
+        let appBrightness = await commonLoad('appBrightness');
 
-        if(mode){
-            mode.value ?  setAppBrightness(0.05) : setAppBrightness(0.20);
+        if(appBrightness){
+            setAppBrightness(appBrightness.value);
         }
         else{
-            setAppBrightness(0.20);
+            if(mode){
+                mode.value ?  setAppBrightness(0.05) : setAppBrightness(0.20);
+            }
+            else{
+                setAppBrightness(0.20);
+            }
         }
     }
     componentDidMount() {
         // 关闭启动动画图
         this._splashScreen(500, 500);
+
+        // 在加载完了可以允许重启
+        CodePush.allowRestart();
+    }
+    componentWillUnmount() {
+        // 页面加载的禁止重启，在加载完了可以允许重启
+        CodePush.disallowRestart();
     }
     // 关闭启动动画图 - function
     _splashScreen(duration: number | string = 500, delay: number | string = 500){
@@ -80,7 +84,7 @@ class App extends Component<Props> {
         // 全局启动配置
         global.launchSettings = {
             // 获取渠道
-            channelID: '',//await AppMetadata.getAppMetadataBy(CHANNEL_KEY),
+            channelID: '', // await AppMetadata.getAppMetadataBy(CHANNEL_KEY),
             agentTag: __DEV__ ? 10 : await AppMetadata.getWalleAppMetadata(),
         };
 
@@ -92,8 +96,9 @@ class App extends Component<Props> {
                 ...launchSettings,
                 ...result.data
             };
+
             this.checkBinaryVersion();
-            //this.setState({isLoading: false});
+            // this.checkJSBundleVersion();
         }
         else {
             let errorMes = result.message;
@@ -113,19 +118,27 @@ class App extends Component<Props> {
                 this.setState({tipText: '初始化错误：' + result.message});
             }
         }
-    }
 
+        // 如果用户没有登录或者登录已经过期
+        if(global.launchSettings && global.launchSettings.isClear){
+            // 清除用户信息
+            removeUserSession && removeUserSession();
+            // 清除redux相关的缓存
+            global.persistStore && global.persistStore.purge();
+        }
+    }
     checkBinaryVersion() {
         BinaryUpgrader.getInstance().check(this.binaryPushStatusDidChange, this.codePushDownloadDidProgress);
     }
-
     checkJSBundleVersion() {
-        //CodePush.sync(CODEPUSH_OPTIONS, this.codePushStatusDidChange, this.codePushDownloadDidProgress);
-        this.launch();
-    }
+        // 取到代码热跟新的key -  暂且为staging包
+        let deploymentKey = DEPLOYMENT_KEYS[Platform.OS].STAGING;
 
+        CodePush.sync(codePushDialogConfig(deploymentKey), this.codePushStatusDidChange, this.codePushDownloadDidProgress);
+
+        // this.launch();
+    }
     binaryPushStatusDidChange(status) {
-        //console.log('binaryPushStatusDidChange', status);
         switch (status) {
             case CodePush.SyncStatus.UP_TO_DATE: //当前已是最新版
                 this.setState({tipText: '当前版本：' + VERSION});
@@ -152,9 +165,7 @@ class App extends Component<Props> {
         }
         this.launch();
     }
-
     codePushStatusDidChange(status) {
-        //console.log('codePushStatusDidChange', status);
         switch (status) {
             case CodePush.SyncStatus.UP_TO_DATE: //当前已是最新版
             case CodePush.SyncStatus.UPDATE_IGNORED: //用户忽略升级
@@ -179,7 +190,6 @@ class App extends Component<Props> {
         }
         this.launch();
     }
-
     codePushDownloadDidProgress(progress) {
         if (typeof progress === 'object') {
             // 进度提示
@@ -195,11 +205,9 @@ class App extends Component<Props> {
             });
         }
     }
-
     async launch() {
         this.setState({isLoading: false});
     }
-
     render() {
         const {store, isLoading, downloadProgress, tipText} = this.state;
 
@@ -213,11 +221,13 @@ class App extends Component<Props> {
                     width={120}
                 />
             );
+
             return (
                 <View style={styles.background}>
+                    <StatusBarSet/>
                     <ActivityIndicator color={BackgroundColor.bg_f3916b} style={styles.loading} />
-                    {this.state.tipText ? <Text style={styles.tip}>{ tipText }</Text> : null}
-                    {this.state.downloadProgress > 0 ? downloadProgressBar : null}
+                    { this.state.tipText ? <Text style={styles.tip}>{ tipText }</Text> : null }
+                    { this.state.downloadProgress > 0 ? downloadProgressBar : null }
                 </View>
             );
         }
@@ -230,6 +240,12 @@ class App extends Component<Props> {
     }
 }
 
+let codePushOptions = { checkFrequency: CodePush.CheckFrequency.MANUAL };
+
+// let AppCodePush = CodePush(codePushOptions)(App);
+// App = withNetworkConnectivity({withRedux: true, checkInBackground: true})(AppCodePush);
+
+App = CodePush(codePushOptions)(App);
 export default App;
 
 const styles = ScaledSheet.create({

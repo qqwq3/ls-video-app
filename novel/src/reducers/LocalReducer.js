@@ -42,6 +42,25 @@ const local = (state = initialState, action: Action) => {
                         ...action.params.status,
                     }
                 });
+
+            // 改变阅读的偏移位置
+            case 'CHANGE_READER_POSITION_LOCAL':
+                return state.setIn(action.params.stateKeys, {
+                    reader: {
+                        timeUpdated: Date.now(),
+                        value: action.params.value,
+                    }
+                });
+
+            // 点亮章节标题
+            case 'CHAPTER_NAME_LIGHT_LOCAL':
+                return state.setIn(action.params.stateKeys, {
+                    chapter: {
+                        timeUpdated: Date.now(),
+                        content: action.params.content,
+                        index: action.params.index,
+                    }
+                });
         }
 
         // 请求失败统一处理

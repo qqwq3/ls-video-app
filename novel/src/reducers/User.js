@@ -107,7 +107,7 @@ const user = (state = initialState, action: Action) => {
                     timeUpdated: Date.now(),
                     ...action.response
                 });
-            //我的书评
+
             // 分类二级 - 刷新 - 成功
             case 'RELOAD_COMMENTS_USER_SUCCESS':
                 return state.setIn(action.params.stateKeys,{
@@ -116,6 +116,7 @@ const user = (state = initialState, action: Action) => {
                     ...action.params,
                     ...action.response.data,
                 });
+
             //  分类二级 - 加载 - 成功
             case 'LOAD_COMMENTS_USER_SUCCESS':
                 return state.updateIn(action.params.stateKeys, m => {
@@ -127,7 +128,9 @@ const user = (state = initialState, action: Action) => {
                             ...action.params,
                         };
                     }
+
                     let records = m.get('records').concat(action.response.data.records);
+
                     return {
                         updateTime: Date.now(),
                         refreshState: RefreshState.Idle,
@@ -136,7 +139,7 @@ const user = (state = initialState, action: Action) => {
                         records: records.toJS(),
                     };
                 });
-                // 我看过的
+
             // 分类二级 - 刷新 - 成功
             case 'RELOAD_HISTORICAL_USER_SUCCESS':
                 return state.setIn(action.params.stateKeys,{
@@ -145,6 +148,7 @@ const user = (state = initialState, action: Action) => {
                     ...action.params,
                     ...action.response.data,
                 });
+
             //  分类二级 - 加载 - 成功
             case 'LOAD_HISTORICAL_USER_SUCCESS':
                 return state.updateIn(action.params.stateKeys, m => {
@@ -156,7 +160,9 @@ const user = (state = initialState, action: Action) => {
                             ...action.params,
                         };
                     }
+
                     let records = m.get('records').concat(action.response.data.records);
+
                     return {
                         updateTime: Date.now(),
                         refreshState: RefreshState.Idle,
@@ -165,10 +171,16 @@ const user = (state = initialState, action: Action) => {
                         records: records.toJS(),
                     };
                 });
+
+            // 删除用户有关的所有信息
+            case 'DELETE_USER_DATA':
+                return state.setIn(action.params.stateKeys, {
+                    login: false,
+                    logoutTimeUpdated: Date.now(),
+                    ...action.response,
+                });
+
         }
-
-
-
 
         // 列表类单独的处理
         if (action.type.endsWith('_REQUEST') || action.type.endsWith('_FAILURE')) {

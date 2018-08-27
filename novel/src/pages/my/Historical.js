@@ -1,21 +1,34 @@
 
 'use strict';
 
-import React,{ Component } from 'react';
-import { View, Text, TouchableOpacity, } from 'react-native';
+import React, { Component, PureComponent } from 'react';
+import { View, Text, TouchableOpacity, StatusBar } from 'react-native';
 import Immutable from 'immutable';
 import { connect } from 'react-redux';
-import { Styles, ScaledSheet,Fonts, Colors, BackgroundColor } from "../../common/Style";
+// import Swipeout from 'react-native-swipeout';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
+import { Styles, ScaledSheet, Fonts, Colors, BackgroundColor } from "../../common/Style";
 import Header from '../../components/Header';
 import Books from '../../components/Books';
-import {pixel, loadImage } from "../../common/Tool";
-import {reloadHistorical,loadHistorical} from "../../actions/User";
+import { pixel, loadImage, height, width } from "../../common/Tool";
+import { reloadHistorical, loadHistorical } from "../../actions/User";
 import NovelFlatList from '../../components/NovelFlatList';
-import { scale } from "react-native-size-matters";
+import DefaultDisplay from '../../components/DefaultDisplay';
 
-type Props = {};
+type Props = {
+    records: Array<any>,
+    currentOffset: number,
+    refreshState: number,
+    totalRecords: number
+};
 
 class Historical extends Component<Props>{
+    static defaultProps = {
+        records: [],
+        currentOffset: 0,
+        refreshState: 0,
+        totalRecords: 0,
+    };
     constructor(props){
         super(props);
         this.state = {
@@ -24,7 +37,7 @@ class Historical extends Component<Props>{
     }
     componentWillMount(refreshState){
         const {  reloadHistorical } = this.props;
-        reloadHistorical && reloadHistorical(refreshState,0);
+        reloadHistorical && reloadHistorical(refreshState, 0);
     }
     // 返回 - function
     _goBack(){
@@ -56,32 +69,55 @@ class Historical extends Component<Props>{
     renderItem({item, index}){
         const textStyles = [ Fonts.fontFamily, Fonts.fontSize12, Colors.gray_808080 ];
         const uri = loadImage(item.bookId);
+        const DeleteButton = () => {
+            return (
+                <View style={[styles.deleteButton, Styles.flexCenter]}>
+                    <Text style={[styles.deleteButtonText, Fonts.fontFamily]}>删除</Text>
+                </View>
+            );
+        };
 
         return (
-            <View style={[{backgroundColor: BackgroundColor.bg_fff}]}>
-                <View style={[styles.BookMarkBox, styles.menuInnerBottomBorder,{borderBottomWidth:scale(1/pixel)}]}>
-                    <Books source={{uri: uri}} clickAble={false} size={'large'}/>
-                    <View style={styles.BookMarkMassage}>
-                        <Text style={[styles.BookMarkTitle, Fonts.fontFamily, Fonts.fontSize15]} numberOfLines={1}>{ item.bookTitle }</Text>
-                        <View style={[styles.BookMarkNew]}>
-                            <Text style={textStyles} numberOfLines={1}>{item.authorName}</Text>
+            <View key={index} style={[{backgroundColor: BackgroundColor.bg_fff}]}>
+                {/*<Swipeout*/}
+                    {/*style={styles.swipeOut}*/}
+                    {/*autoClose={false}*/}
+                    {/*right={[{*/}
+                        {/*backgroundColor: 'red',*/}
+                        {/*component: <DeleteButton/>,*/}
+                        {/*onPress: () => this._delete(item.bookIdHex),*/}
+                    {/*}]}*/}
+                    {/*buttonWidth={scale(75) + moderateScale(15)}*/}
+                    {/*sensitivity={10}*/}
+                {/*>*/}
+                    <View style={[styles.BookMarkBox, styles.menuInnerBottomBorder, {borderBottomWidth: scale(1 / pixel)}]}>
+                        <Books source={{uri: uri}} clickAble={false} size={'large'}/>
+                        <View style={styles.BookMarkMassage}>
+                            <Text style={[styles.BookMarkTitle, Fonts.fontFamily, Fonts.fontSize15]} numberOfLines={1}>{ item.bookTitle }</Text>
+                            <View style={[styles.BookMarkNew]}>
+                                <Text style={textStyles} numberOfLines={1}>{ item.authorName }</Text>
+                            </View>
+                            <View style={[styles.BookMarkNew, {alignItems:'flex-end'}]}>
+                                <Text style={textStyles} numberOfLines={1}>{ item.chapterTitle }</Text>
+                            </View>
                         </View>
-                        <View style={[styles.BookMarkNew, {alignItems:'flex-end'}]}>
-                            <Text style={textStyles} numberOfLines={1}>{item.chapterTitle}</Text>
-                        </View>
+                        <TouchableOpacity
+                            activeOpacity={0.75}
+                            style={[styles.continueButs, Styles.paddingRight15]}
+                            onPress={this._continueReader.bind(this, item)}
+                        >
+                            <View style={[styles.buts, {borderColor: BackgroundColor.bg_f3916b}, Styles.flexCenter]}>
+                                <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.orange_f3916b]}>继续阅读</Text>
+                            </View>
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                        activeOpacity={0.75}
-                        style={[styles.continueButs, Styles.paddingRight15]}
-                        onPress={this._continueReader.bind(this,item)}
-                    >
-                        <View style={[styles.buts, {borderColor: BackgroundColor.bg_f3916b}, Styles.flexCenter]}>
-                            <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.orange_f3916b]}>继续阅读</Text>
-                        </View>
-                    </TouchableOpacity>
-                </View>
+                {/*</Swipeout>*/}
             </View>
         );
+    }
+    // 删除单本书记录 - function
+    _delete(bookIdHex){
+
     }
     // 继续阅读 - function
     _continueReader(item){
@@ -89,26 +125,40 @@ class Historical extends Component<Props>{
         const hexId = item.bookIdHex;
         const bookId = item.bookId;
         const bookHexId = item.bookIdHex;
+        const chapterHexId = `book_id${hexId}`;
 
         //const sourceSiteIndex = item.sourceSiteIndex;
         //const vipChapterIndex = item.vipChapterIndex;
         //const value = parseInt(sourceSiteIndex) >= parseInt(vipChapterIndex) ? '1' : '0';
 
-        navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: true});
+        // navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: true});
+
+        navigation && navigation.navigate('Reader',{
+            chapterHexId,
+            bookHexId,
+            bookId
+        });
     }
     renderContent(){
-        let { currentOffset, refreshState, totalRecords } = this.props;
-        let records = this.props.records ? this.props.records : [];
+        const { currentOffset, refreshState, totalRecords, records } = this.props;
+        const _height =  height - (StatusBar.currentHeight + verticalScale(44));
+
         return (
             <NovelFlatList
+                showArrow={true}
                 data={records}
+                ListEmptyComponent={
+                    <View style={[{height: _height, width: width}]}>
+                        <DefaultDisplay />
+                    </View>
+                }
                 renderItem={this.renderItem.bind(this)}
                 keyExtractor={(item,index) => index + ''}
                 onHeaderRefresh={this.onHeaderRefresh.bind(this)}
                 onFooterRefresh={this.onFooterRefresh.bind(this)}
                 refreshState={refreshState}
                 totalRecords={totalRecords}
-                offset={ currentOffset }
+                offset={currentOffset}
             />
         );
     }
@@ -123,6 +173,17 @@ class Historical extends Component<Props>{
 }
 
 const styles = ScaledSheet.create({
+    swipeOut:{
+        backgroundColor: BackgroundColor.bg_fff,
+    },
+    deleteButton:{
+        backgroundColor: 'red',
+        flex: 1,
+    },
+    deleteButtonText: {
+        fontSize: '15@ms',
+        color: BackgroundColor.bg_fff,
+    },
     continueButs: {
         zIndex: 1,
         backgroundColor: 'transparent',
@@ -171,12 +232,14 @@ const styles = ScaledSheet.create({
         borderStyle: 'solid',
     },
 });
+
 const mapStateToProps = (state, ownProps) => {
     let userData = state.getIn(['user', 'userData','historicalData']);
+
     if(Immutable.Map.isMap(userData)){ userData = userData.toJS() }
     return { ...ownProps, ...userData };
 };
-export default connect(mapStateToProps,{ reloadHistorical,loadHistorical})(Historical);
+export default connect(mapStateToProps,{ reloadHistorical, loadHistorical })(Historical);
 
 
 

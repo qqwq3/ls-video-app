@@ -17,34 +17,41 @@ import Header from '../../components/Header';
 import { readerImg } from "../../common/Icons";
 import BaseComponent from '../../components/BaseComponent';
 import { updateChapter } from '../../actions/LocalAction';
+import { fineCommonRemoveSingle } from '../../common/Storage';
 
-type Props = {};
+type Props = {
+    chapter?: Object
+};
 
 type State = {};
 
 class ChapterDirectory extends Component<Props, State>{
-    static defaultProps = {};
+    static defaultProps = {
+        chapter: {},
+    };
     constructor(props){
         super(props);
         this.state = {
             currentIndex: 0,
+            currentChapterHexId: null,
         };
         this.errorTime = Date.now();
-    }
-    componentWillMount() {
-        const { navigation } = this.props;
-        const type = navigation.getParam('type');
-
-        //type !== 'chapter' && statusBarSet && statusBarSet.barHide();
+        this.chapterTime = Date.now();
     }
     componentDidMount() {
-        const { navigation } = this.props;
+        const { navigation, chapter } = this.props;
         const type = navigation.getParam('type');
 
         this.onHeaderRefreshChapter && this.onHeaderRefreshChapter(RefreshState.HeaderRefreshing);
 
         if(type === 'bookmark'){
            // this.onHeaderRefreshBookmark && this.onHeaderRefreshBookmark(RefreshState.HeaderRefreshing);
+        }
+
+        //type !== 'chapter' && statusBarSet && statusBarSet.barHide();
+
+        if(Object.keys(chapter).length !== 0 ){
+            this.setState({currentChapterHexId: chapter.content[chapter.index / width].currentChapterHexId});
         }
     }
     componentWillUnmount() {
@@ -55,7 +62,16 @@ class ChapterDirectory extends Component<Props, State>{
     }
     componentWillReceiveProps(nextProps) {
 
-        // console.log('777777',nextProps);
+        // console.log('chapterDirectory.js',nextProps);
+
+        // if(nextProps.chapter && nextProps.chapter.timeUpdated > this.chapterTime){
+        //     this.chapterTime = nextProps.chapter.timeUpdated;
+        //
+        //     let content = nextProps.chapter.content;
+        //     let index = nextProps.chapter.index;
+        //
+        //     this.setState({currentChapterHexId: content[index / width]});
+        // }
 
         // if(nextProps.mark && nextProps.mark.error){
         //     if(nextProps.mark.error.timeUpdated > this.errorTime){
@@ -67,19 +83,29 @@ class ChapterDirectory extends Component<Props, State>{
     // 从章节去阅读 - function
     chapterReader(item, sourceSiteIndex, vipChapterIndex){
         const { navigation, updateChapter, directory } = this.props;
-        const hexId = item.hexId;
+        const chapterHexId = item.hexId;
         const bookId = item.bookId;
         const bookHexId = directory && directory.book && directory.book.hexId;
 
         // const value = parseInt(sourceSiteIndex) >= parseInt(vipChapterIndex) ? '1' : '0';
 
         updateChapter && updateChapter(true);
-        navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: false});
+        // navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: false});
+
+        this.setState({currentChapterHexId: item.hexId});
+        fineCommonRemoveSingle && fineCommonRemoveSingle('allBookCapter', bookHexId + 'currentChapter');
+
+        navigation && navigation.navigate('Reader',{
+            chapterHexId,
+            bookHexId,
+            bookId
+        });
     }
     // 返回 - function
     _goBack() {
         const { navigation } = this.props;
         navigation && navigation.goBack();
+        // navigation && navigation.pop();
     }
     // 头部 - demo
     renderHeader() {
@@ -101,6 +127,7 @@ class ChapterDirectory extends Component<Props, State>{
         const { directory } = this.props;
         const book = directory ? directory.book : false;
         const vipChapterIndex = book ? book.vipChapterIndex : 0;
+        const fontColor = this.state.currentChapterHexId === item.hexId ? Colors.orange_f3916b : Colors.gray_808080;
 
         return (
             <TouchableOpacity
@@ -111,14 +138,14 @@ class ChapterDirectory extends Component<Props, State>{
             >
                 <Text
                     numberOfLines={1}
-                    style={[Fonts.fontFamily, Fonts.fontSize14, Colors.gray_808080, {maxWidth: width - scale(60)}]}
+                    style={[Fonts.fontFamily, Fonts.fontSize14, fontColor, {maxWidth: width - scale(60)}]}
                 >
                     { item.title }
                 </Text>
-                {
-                    (parseInt(item.sourceSiteIndex) >= parseInt(vipChapterIndex) && parseInt(vipChapterIndex) !== 0)
-                    ? <Image source={readerImg.rmb} style={[Img.resizeModeContain, styles.rmbImage]}/> : null
-                }
+                {/*{*/}
+                    {/*(parseInt(item.sourceSiteIndex) >= parseInt(vipChapterIndex) && parseInt(vipChapterIndex) !== 0)*/}
+                    {/*? <Image source={readerImg.rmb} style={[Img.resizeModeContain, styles.rmbImage]}/> : null*/}
+                {/*}*/}
             </TouchableOpacity>
         );
 
@@ -168,6 +195,7 @@ class ChapterDirectory extends Component<Props, State>{
         return (
             <View style={[styles.rcBody]} tabLabel={'目录'}>
                 <NovelFlatList
+                    showArrow={true}
                     data={records}
                     renderItem={this.renderItemChapter.bind(this)}
                     keyExtractor={(item, index) => index + ''}
@@ -392,16 +420,16 @@ const mapStateToProps = (state, ownProps) => {
     const type = ownProps.navigation.getParam('type');
     const hexId = ownProps.navigation.getParam('hexId');
     let data = state.getIn(['chapterDirectory', type, hexId]);
+    let localData = state.getIn(['local','chapterTitle']);
 
     if(Immutable.Map.isMap(data)){ data = data.toJS() }
-    return { ...ownProps, ...data };
+    if(Immutable.Map.isMap(localData)){ localData = localData.toJS() }
+    return { ...ownProps, ...data, ...localData };
 };
 
 export default connect(mapStateToProps,{
-    reloadChapterDirectory,
-    loadChapterDirectory,
-    reloadBookMark,
-    loadBookMark,
+    reloadChapterDirectory, loadChapterDirectory,
+    reloadBookMark, loadBookMark,
     updateChapter
 })(ChapterDirectory);
 

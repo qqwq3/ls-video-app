@@ -2,30 +2,40 @@
 'use strict';
 
 import React, { Component } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView, Modal } from 'react-native';
 import Immutable from 'immutable';
 import { connect } from 'react-redux';
 import LinearGradient from 'react-native-linear-gradient';
-import { scale, verticalScale } from 'react-native-size-matters';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { Styles, ScaledSheet, Fonts, BackgroundColor, Colors, Img } from "../../common/Style";
 import Header from '../../components/Header';
-import { signIn } from "../../common/Icons";
+import { signIn, mix } from "../../common/Icons";
 import { checkSignIn, userSignIn } from "../../actions/User";
-import { infoToast, setStatusBar } from "../../common/Tool";
+import { infoToast, setStatusBar, width } from "../../common/Tool";
 import BaseComponent from "../../components/BaseComponent";
 
 type Props = {};
 
-class SignIn extends BaseComponent<Props>{
+type State = {};
+
+class SignIn extends BaseComponent<Props, State>{
     constructor(props){
         super(props);
         this.state = {
             sigInArr: [1, 2, 3, 4, 5, 6],
             signIn: true,
             signInDays: 0,
-            totalRewards: 0
+            totalRewards: 0,
+            modalVisible: false,
         };
         this.updateTime = Date.now();
+    }
+    componentWillMount() {
+        const isLogin = this.isAuthorized();
+
+        if(!isLogin){
+            this.setState({signIn: false});
+        }
     }
     componentDidMount() {
         const { checkSignIn } = this.props;
@@ -52,18 +62,19 @@ class SignIn extends BaseComponent<Props>{
 
         if(nextProps && nextProps.timeSignUpdated > this.updateTime){
             this.updateTime = Date.now();
-            const data = nextProps.data;
+            let _data = nextProps.data;
 
             this.setState({
-                signInDays: data.cycleDays + 1,
+                signInDays: Number(_data.cycleDays) + 1,
                 signIn: true,
-                totalRewards: data.totalRewards
+                totalRewards: _data.totalRewards
             });
-            infoToast && infoToast(data.text);
+
+            infoToast && infoToast(_data.text);
         }
     }
     componentWillUnmount() {
-        setStatusBar && setStatusBar(BackgroundColor.bg_fff,true);
+        setStatusBar && setStatusBar(BackgroundColor.bg_fff, false);
     }
     // 返回 - function
     _goBack(){
@@ -82,14 +93,15 @@ class SignIn extends BaseComponent<Props>{
                 borderBottomColor={BackgroundColor.bg_ff5a5a}
                 goBack={this._goBack.bind(this)}
                 headerBackgroundColor={BackgroundColor.bg_ff5a5a}
-                // titleRightChildren={
-                //     <TouchableOpacity
-                //         activeOpacity={0.5}
-                //         style={[styles.titleRightChildren, Styles.paddingRight15]}
-                //     >
-                //         <Image source={signIn.info} style={[Img.resizeModeContain, styles.titleRightChildrenImage]}/>
-                //     </TouchableOpacity>
-                // }
+                titleRightChildren={
+                    <TouchableOpacity
+                        activeOpacity={0.5}
+                        style={[styles.titleRightChildren, Styles.paddingRight15]}
+                        onPress={() => this._modalControl()}
+                    >
+                        <Image source={signIn.info} style={[Img.resizeModeContain, styles.titleRightChildrenImage]}/>
+                    </TouchableOpacity>
+                }
             />
         );
     }
@@ -109,7 +121,7 @@ class SignIn extends BaseComponent<Props>{
                         <View style={{alignItems:'center',marginTop: verticalScale(60)}}>
                             <Text style={[Fonts.fontFamily, Fonts.fontSize15, Colors.white_FFF]}>累计获得</Text>
                         </View>
-                        <View style={{alignItems:'center',marginTop: verticalScale(25)}}>
+                        <View style={{alignItems:'center',marginTop: verticalScale(20)}}>
                             <Text style={[Fonts.fontFamily, Fonts.fontSize36, Colors.white_FFF]}>{ this.state.totalRewards || 0 }</Text>
                         </View>
                     </View>
@@ -189,32 +201,122 @@ class SignIn extends BaseComponent<Props>{
     // 签到 - function
     _signIn(){
         const { userSignIn } = this.props;
+        const isLogin = this.isAuthorized();
 
-        // this.setState({
-        //     signInDays: this.state.signInDays + 1,
-        //     totalRewards: res.data.total_rewards,
-        //     signIn: true,
-        // });
+        if(!isLogin){
+            return infoToast && infoToast('请先登录');
+        }
 
         userSignIn && userSignIn();
+    }
+    // 弹出层开或者关控制 - function
+    _modalControl(){
+        this.setState({modalVisible: !this.state.modalVisible});
+    }
+    // 弹出层 - demo
+    renderPop(){
+        const comFontStyles = [{
+            marginBottom: moderateScale(10),
+            lineHeight: verticalScale(22)},
+            Fonts.fontFamily,
+            Fonts.fontSize14,
+            Colors.gray_4c4c4c
+        ];
+
+        return (
+            <Modal
+                visible={this.state.modalVisible}
+                animationType={'slide'}
+                transparent={true}
+                onRequestClose={() => this._modalControl()}
+            >
+                <View style={[styles.signInPop, Styles.flexCenter]}>
+                    <View style={styles.signInPopContent}>
+                        <TouchableOpacity
+                            onPress={() => this._modalControl()}
+                            activeOpacity={0.75}
+                            style={[styles.signInPopClose, Styles.paddingHorizontal15, Styles.paddingTop15]}
+                        >
+                            <Image
+                                source={mix.ruleClose}
+                                style={[{width: scale(12), height: verticalScale(12)}, Img.resizeModeContain]}
+                            />
+                        </TouchableOpacity>
+                        <View style={{alignItems:'center'}}>
+                            <Text style={[
+                                Fonts.fontWeightBold ,
+                                Fonts.fontFamily ,
+                                Fonts.fontSize20 ,
+                                Colors.gray_4c4c4c ,
+                                styles.textShadow
+                            ]}>
+                                签到规则
+                            </Text>
+                        </View>
+                        <View style={[{overflow:'hidden', marginTop: moderateScale(5), alignSelf: 'center'}, Styles.padding15]}>
+                            <Text includeFontPadding={false} style={comFontStyles}>
+                                {'\u3000\u3000'}签到每次可以获取到金币的奖励，连续签到第<Text style={[Colors.orange_ff5a5a]}> 7 </Text>天可以获取大礼包奖励。
+                            </Text>
+                            <Text includeFontPadding={false} style={comFontStyles}>
+                                {'\u3000\u3000'}签到<Text style={[Colors.orange_ff5a5a]}> 7 </Text>天为一个循环，从第一次签到开始，连续签到第
+                                <Text style={[Colors.orange_ff5a5a]}> 7 </Text>天即可获取到大礼包。
+                            </Text>
+                            <Text includeFontPadding={false} style={comFontStyles}>
+                                {'\u3000\u3000'}中途漏签不累计，再次签到后重新开始累计连续签到天数。
+                            </Text>
+                            <Text includeFontPadding={false} style={comFontStyles}>
+                                {'\u3000\u3000'}签到每天一次，凌晨<Text style={[Colors.orange_ff5a5a]}> 00:00 </Text>后即可开始新一天的签到。
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        );
     }
     render(){
         return (
             <View style={[Styles.container, {backgroundColor: BackgroundColor.bg_fff}]}>
                 { this.renderHeader() }
                 { this.renderContent() }
+                { this.renderPop() }
             </View>
         );
     }
 }
 
 const styles = ScaledSheet.create({
+    textShadow: {
+        textShadowColor: '#cccccc',
+        textShadowOffset: { width: scale(2),height: verticalScale(1.5) },
+        textShadowRadius: 4,
+    },
+    signInPopClose:{
+        height: '30@vs',
+        flexDirection:'row',
+        justifyContent:'flex-end',
+    },
+    signInPop:{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        backgroundColor: BackgroundColor.bg_transparent,
+        zIndex: 500,
+    },
+    signInPopContent:{
+        width: width - scale(80),
+        backgroundColor: BackgroundColor.bg_fff,
+        borderRadius: 6,
+        overflow: 'hidden',
+        elevation: 6,
+    },
     signInView: {
         flex: 1,
         height: '2@vs',
     },
     signInButton:{
-        backgroundColor:'#f3916b',
+        backgroundColor: BackgroundColor.bg_f3916b,
         height: '40@vs',
         width: '190@s',
         borderRadius: '20@ms',
@@ -293,10 +395,12 @@ const styles = ScaledSheet.create({
 });
 
 const mapStateToProps = (state, ownProps) => {
-    let userData = state.getIn(['user','userData','signIn']);
+    let userDataSignIn = state.getIn(['user','userData','signIn']);
+    let userDataBaseInfo = state.getIn(['user','userData','baseInfo']);
 
-    if(Immutable.Map.isMap(userData)){ userData = userData.toJS() }
-    return { ...ownProps, ...userData };
+    if(Immutable.Map.isMap(userDataSignIn)){ userDataSignIn = userDataSignIn.toJS() }
+    if(Immutable.Map.isMap(userDataBaseInfo)){ userDataBaseInfo = userDataBaseInfo.toJS() }
+    return { ...ownProps,  ...userDataBaseInfo, ...userDataSignIn };
 };
 
 export default connect(mapStateToProps,{ checkSignIn, userSignIn })(SignIn);

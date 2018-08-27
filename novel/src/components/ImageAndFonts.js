@@ -106,8 +106,8 @@ const styles = ScaledSheet.create({
         height: '18@vs',
     },
     signInImage:{
-        width: '20@s',
-        height: '20@vs',
+        width: '18@s',
+        height: '18@vs',
     }
 });
 

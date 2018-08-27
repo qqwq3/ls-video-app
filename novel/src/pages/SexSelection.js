@@ -10,6 +10,8 @@ import { sex } from "../common/Icons";
 import { submitSex } from '../actions/SexSelection';
 import { commonLoad } from "../common/Storage";
 import BaseComponent from "../components/BaseComponent";
+import { setStatusBar } from "../common/Tool";
+import StatusBarSet from '../components/StatusBarSet';
 
 type Props = {};
 
@@ -43,6 +45,9 @@ class SexSelection extends BaseComponent<Props, State>{
         else {
             this.setState({serverRet: true});
         }
+
+        // 状态栏设置
+        setStatusBar && setStatusBar('#FFFFFF',true);
     }
     componentWillReceiveProps(nextProps){
         super.componentWillReceiveProps(nextProps);
@@ -74,6 +79,7 @@ class SexSelection extends BaseComponent<Props, State>{
         if(!serverRet) {
             return (
                 <View style={styles.background}>
+                    <StatusBarSet/>
                     <ActivityIndicator color={BackgroundColor.bg_f3916b} style={styles.loading} />
                     <Text style={styles.tip}>内容载入中...</Text>
                 </View>
@@ -82,6 +88,8 @@ class SexSelection extends BaseComponent<Props, State>{
 
         return (
             <View style={[Styles.container]}>
+                <StatusBarSet/>
+
                 <TouchableHighlight
                     onPress={this.noSelect.bind(this)}
                     activeOpacity={1.0}
@@ -153,6 +161,7 @@ const styles = ScaledSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-end',
         paddingRight: '15@ms',
+        marginTop: '10@vs',
     },
     selectTitle: {
         marginVertical: '60@ms',

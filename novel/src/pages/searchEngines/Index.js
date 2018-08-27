@@ -2,36 +2,73 @@
 'use strict';
 
 import React,{ Component } from 'react';
-import { View, Text, TouchableOpacity, Image, TextInput, Keyboard } from 'react-native';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    Image,
+    TextInput,
+    Keyboard,
+    ScrollView,
+    Alert,
+    BackHandler,
+    StatusBar
+} from 'react-native';
 import Immutable from 'immutable';
 import _ from 'loadsh';
 import { connect } from 'react-redux';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import Highlighter from 'react-native-highlight-words';
 import { Styles, ScaledSheet, Img, Fonts, Colors, BackgroundColor } from "../../common/Style";
-import { mix } from "../../common/Icons";
+import { mix, def } from "../../common/Icons";
 import Header from '../../components/Header';
-import {infoToast, loadImage, numberConversion, pixel} from "../../common/Tool";
+import { height, infoToast, closeInfoToast, loadImage, numberConversion, pixel, width } from "../../common/Tool";
 import Books from '../../components/Books';
-import { reloadSearch, loadSearch } from "../../actions/Classification";
+import { reloadSearch, loadSearch, cleanSearch } from "../../actions/Classification";
 import NovelFlatList from '../../components/NovelFlatList';
 import { RefreshState } from "../../common/Tool";
 import DefaultDisplay from "../../components/DefaultDisplay";
+import { commonSave, commonLoad, commonRemove } from "../../common/Storage";
+import Dialog from '../../components/Dialog';
 
-type Props = {};
+type Props = {
+    records: ?Array<any>,
+    cleanSearch: () => void,
+    loadSearch: () => void,
+    reloadSearch: () => void,
+    currentOffset: ?number,
+    refreshState: ?number,
+    totalRecords?: number | string,
+};
 
-const ITEM_HEIGHT = 125;
+type State = {};
 
-class SearchEngines extends Component<Props>{
+const ITEM_HEIGHT = verticalScale(125);
+
+class SearchEngines extends Component<Props, State, *>{
+    static defaultProps = {
+        records: [],
+        currentOffset: 12,
+        refreshState: 0,
+        totalRecords: 0
+    };
     constructor(props){
         super(props);
         this.state = {
             searchValue: '',
-            searchStatus: false
+            searchStatus: false,
+            searchRecords: [],
+            searchKeywordStatus: true,
+            searchDefaultValue: '',
         };
         this.errorTiem = Date.now();
+        this.toast = null;
     }
-    componentWillMount(){
+    async componentWillMount(){
         this._keyboardHide = Keyboard.addListener('keyboardDidHide',this._keyboardDidHideHandler.bind(this));
+
+        let _arr = await commonLoad('searchKeywords');
+        if(_arr) { this.setState({searchRecords: _arr.searchRecords}) }
     }
     componentDidMount() {
         // this.onHeaderRefresh && this.onHeaderRefresh(RefreshState.HeaderRefreshing);
@@ -41,7 +78,7 @@ class SearchEngines extends Component<Props>{
             this.errorTiem = nextProps.error.timeUpdated;
 
             if(parseInt(nextProps.error.code) === 500){
-                infoToast('服务器出错啦，请稍后再试');
+                this.toast = infoToast('服务器出错啦，请稍后再试');
             }
 
             this.setState({searchStatus: false});
@@ -49,6 +86,12 @@ class SearchEngines extends Component<Props>{
     }
     componentWillUnmount(){
         this._keyboardHide && this._keyboardHide.remove();
+
+        if(this.props.records && (this.props.records).length !== 0){
+            this.props.cleanSearch && this.props.cleanSearch();
+        }
+
+        this.toast && closeInfoToast(this.toast);
     }
     _keyboardDidHideHandler(){
         this.textInputRef && this.textInputRef.blur();
@@ -60,8 +103,15 @@ class SearchEngines extends Component<Props>{
     // 搜索提交
     _onSubmitEditing(events){
         const word = events.nativeEvent.text || this.state.searchValue;
+
         this.props.reloadSearch && this.props.reloadSearch(word, RefreshState.HeaderRefreshing, 0);
-        this.setState({searchStatus: true});
+        this.setState({searchStatus: true, searchKeywordStatus: false});
+
+        let searchRecords = this.state.searchRecords;
+
+        searchRecords.push(word);
+        searchRecords = _.uniq(searchRecords);
+        commonSave && commonSave('searchKeywords',{ searchRecords });
     }
     // 头部 - demo
     renderHeader(){
@@ -84,6 +134,7 @@ class SearchEngines extends Component<Props>{
                                 placeholderTextColor={'#808080'}
                                 style={[styles.textInput, styles.searchBox]}
                                 underlineColorAndroid={'transparent'}
+                                defaultValue={this.state.searchDefaultValue}
                                 onChangeText={this._onChangeText.bind(this)}
                                 onSubmitEditing={this._onSubmitEditing.bind(this)}
                             />
@@ -105,7 +156,6 @@ class SearchEngines extends Component<Props>{
     // 取消 - function
     _cancelSearch(){
         const { navigation } = this.props;
-
         navigation && navigation.goBack();
     }
     // 数据渲染 - demo
@@ -136,16 +186,16 @@ class SearchEngines extends Component<Props>{
                             textToHighlight={item.title}
                         />
                         <View style={[styles.BookMarkNew]}>
-                            <View style={{marginRight: 5}}>
+                            <View style={{marginRight: moderateScale(5)}}>
                                 <Text style={textStyles} numberOfLines={1}>最新章节</Text>
                             </View>
-                            <View style={{maxWidth:193}}>
+                            <View style={{maxWidth: scale(193)}}>
                                 <Text style={textStyles} numberOfLines={1}>{ item.latestChapter.title }</Text>
                             </View>
                         </View>
-                        <View style={[styles.BookMarkNew, {alignItems:'flex-end'}]}>
-                            <View style={{marginRight: 5}}>
-                                {/*<Text style={textStyles} numberOfLines={1}>{ item.author.name }</Text>*/}
+                        <View style={[styles.BookMarkNew, {alignItems:'flex-end', justifyContent: 'space-between'}]}>
+                            <View style={[{marginRight: moderateScale(5), flexDirection: 'row'}]}>
+                                <Text style={textStyles} numberOfLines={1}>作者：</Text>
                                 <Highlighter
                                     style={textStyles}
                                     numberOfLines={1}
@@ -171,19 +221,67 @@ class SearchEngines extends Component<Props>{
 
         navigation && navigation.navigate('Details',{ hexId, bookId });
     }
+    // 记忆搜索 - function
+    _keywordSearch(word){
+        this.props.reloadSearch && this.props.reloadSearch(word, RefreshState.HeaderRefreshing, 0);
+        this.setState({
+            searchStatus: true,
+            searchKeywordStatus: false,
+            searchDefaultValue: word,
+            searchValue: word,
+        });
+    }
     // 内容 - demo
     renderContent(){
-        const { currentOffset, refreshState, totalRecords } = this.props;
-        const records = this.props.records ? (this.props.records || []) : [];
+        const { currentOffset, refreshState, totalRecords, records } = this.props;
+        const { searchRecords, searchKeywordStatus } = this.state;
+        const _height =  height - (StatusBar.currentHeight + verticalScale(44));
 
-        if(records.length === 0){
-            return <DefaultDisplay/>;
+        if(searchRecords.length !== 0 && searchKeywordStatus){
+            return (
+                <ScrollView showsVerticalScrollIndicator={false} style={styles.keywordsContent}>
+                    <View style={[styles.memoryBox]}>
+                        <View style={[styles.memoryHeader, Styles.paddingHorizontal15]}>
+                            <Text style={[Fonts.fontFamily, Fonts.fontSize15, Colors.gray_404040]}>上次搜索过</Text>
+                        </View>
+                        <View style={[styles.memoryBody, Styles.paddingHorizontal15, Styles.paddingBottom15]}>
+                            {
+                                searchRecords.map((word, index) => {
+                                    return (
+                                        <TouchableOpacity
+                                            key={index}
+                                            activeOpacity={0.50}
+                                            onPress={this._keywordSearch.bind(this, word)}
+                                            style={[styles.memorySingleBox,  Styles.marginRight15, Styles.marginBottom15,]}
+                                        >
+                                            <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.orange_f3916b]}>{ word }</Text>
+                                        </TouchableOpacity>
+                                    )
+                                })
+                            }
+                        </View>
+                        <TouchableOpacity
+                            activeOpacity={0.50}
+                            style={[styles.memoryAllClean, Styles.flexCenter]}
+                            onPress={this._memoryKeywordsClean.bind(this)}
+                        >
+                            <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.gray_808080]}>全部清空</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            );
         }
 
         return (
             <NovelFlatList
-                //getItemLayout={(data, index) => ({length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index})}
+                // getItemLayout={(data, index) => ({length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index})}
                 data={records}
+                // ListEmptyComponent={this._listEmptyComponent.bind(this)}
+                ListEmptyComponent={
+                    <View style={[{height: _height, width: width}]}>
+                        <DefaultDisplay />
+                    </View>
+                }
                 renderItem={this.renderItemBooks.bind(this)}
                 keyExtractor={(item, index) => index + ''}
                 onHeaderRefresh={this.onHeaderRefresh.bind(this)}
@@ -192,13 +290,74 @@ class SearchEngines extends Component<Props>{
                 numColumns={1}
                 totalRecords={totalRecords}
                 offset={currentOffset}
+                showArrow={true}
                 contentContainerStyle={styles.contentContainerStyle}
             />
+        );
+    }
+    // 为空的时候显示 - demo
+    _listEmptyComponent(){
+        return (
+            <View style={[Styles.flexCenter, Styles.marginTop15]}>
+                <DefaultDisplay
+                    showText={true}
+                    text={'暂无搜索记录'}
+                />
+            </View>
+        );
+    }
+    // 全部清空上次搜索记录 - function
+    _memoryKeywordsClean(){
+        // Alert.alert('提示','确定要清空上次搜索记录吗？',[
+        //     { text: '取消', onPress: () => {} },
+        //     { text: '确定', onPress: () => {
+        //             commonRemove && commonRemove('searchKeywords');
+        //             this.setState({searchKeywordStatus: false});
+        //         }
+        //     }
+        // ]);
+
+        this.popExitRef && this.popExitRef.modeShow();
+    }
+    // 立即清空 - function
+    onDismissExit(){
+        commonRemove && commonRemove('searchKeywords');
+        this.setState({searchKeywordStatus: false});
+        this.popExitRef && this.popExitRef.modeHide();
+    }
+    // 暂不清空 - function
+    onConfirmExit(){
+        this.popExitRef && this.popExitRef.modeHide();
+    }
+    // 选择操作 - demo
+    renderSelect(){
+        return (
+            <Dialog
+                popHeight={verticalScale(180)}
+                ref={ref => this.popExitRef = ref}
+                animationType={'slide'}
+                title={'温馨提示'}
+                buttonLeftText={'立即清空'}
+                buttonRightText={'暂不清空'}
+                mandatory={true}
+                onDismiss={this.onDismissExit.bind(this)}
+                onConfirm={this.onConfirmExit.bind(this)}
+            >
+                <View style={[Styles.flexCenter, Styles.flex1]}>
+                    <Text style={[Fonts.fontSize15, Fonts.fontFamily, Colors.gray_404040]}>确定要清空上次搜索记录吗？</Text>
+                </View>
+            </Dialog>
         );
     }
     // 头部刷新 - function
     onHeaderRefresh(refreshState){
         const { searchValue } = this.state;
+        const { records } = this.props;
+
+        if(records.length === 0){
+            this.toast = infoToast('请输入关键字词');
+            return;
+        }
 
         this.props.reloadSearch && this.props.reloadSearch(searchValue, refreshState, 0);
     }
@@ -214,12 +373,58 @@ class SearchEngines extends Component<Props>{
             <View style={[Styles.container]}>
                 { this.renderHeader() }
                 { this.renderContent() }
+                { this.renderSelect() }
             </View>
         );
     }
 }
 
 const styles = ScaledSheet.create({
+    memoryAllClean: {
+        height: '44@vs'
+    },
+    memorySingleBox: {
+        backgroundColor: BackgroundColor.bg_f1f1f1,
+        paddingHorizontal: '20@ms',
+        paddingVertical: '10@ms',
+        borderRadius: '2.5@ms',
+    },
+    memoryBox: {
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    memoryHeader: {
+        height: '44@vs',
+        alignItems:'center',
+        justifyContent: 'flex-start',
+        flexDirection:'row',
+    },
+    memoryBody: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        flexWrap: 'wrap',
+    },
+    keywordsRows:{
+        height: '45@vs',
+        borderBottomColor:'#dcdcdc',
+        borderBottomWidth: moderateScale(1 / pixel),
+        alignItems:'center',
+        flexDirection:'row'
+    },
+    rowsClickText:{
+        flex: 1,
+        height: '45@vs',
+        justifyContent: 'center'
+    },
+    keywordsRowsView:{
+        flex: 1,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexDirection: 'row'
+    },
+    keywordsContent: {
+        width: '100%',
+    },
     contentContainerStyle: {
         paddingBottom: 0,
     },
@@ -298,7 +503,7 @@ const mapStateToProps = (state, ownProps) => {
     return { ...ownProps, ...data };
 };
 
-export default connect(mapStateToProps,{reloadSearch,loadSearch})(SearchEngines);
+export default connect(mapStateToProps,{reloadSearch, loadSearch, cleanSearch})(SearchEngines);
 
 
 

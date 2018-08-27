@@ -6,7 +6,7 @@ import { View, Text, Image, TouchableOpacity } from 'react-native';
 import ImageLoad from 'react-native-image-placeholder';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { Styles, ScaledSheet } from "../common/Style";
-import {def, sex} from "../common/Icons";
+import { def, sex } from "../common/Icons";
 
 type Props = {
     clickAble?: boolean,
@@ -22,8 +22,8 @@ type State = {
 class Books extends PureComponent<Props, State>{
     static defaultProps = {
         clickAble: true, // false
-        size: 'large', // small,minimum
-        source: require('../images/other/cover1.png'),
+        size: 'large', // small, minimum
+        source: def.book, //require('../images/other/cover1.png'),
         activeOpacity: 0.50,
     };
     constructor(props){

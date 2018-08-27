@@ -16,7 +16,9 @@ import _ from 'loadsh';
 import moment from 'moment';
 import accounting from 'accounting';
 import Toast from 'react-native-root-toast';
+import Slider from "react-native-slider";
 import GestureRecognizer from 'react-native-swipe-gestures';
+import Swiper from 'react-native-swiper';
 import * as DeviceInfo from 'react-native-device-info';
 import { withNavigationFocus } from 'react-navigation';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
@@ -28,22 +30,28 @@ import DrawerJsx from '../../components/DrawerJsx';
 import BaseComponent from "../../components/BaseComponent";
 import SharePop from '../../components/SharePop';
 import Chrysanthemum from "../../components/Chrysanthemum";
-import { updateChapter } from '../../actions/LocalAction';
+import { updateChapter, readerPosition, lightChapterTitle } from '../../actions/LocalAction';
 import StatusBarSet from '../../components/StatusBarSet';
-import { commonSave, commonLoad } from "../../common/Storage";
+import { commonSave, commonLoad, fineCommonSave, fineCommonLoad } from "../../common/Storage";
 import {
     width, height, AnimatedTiming,
     infoToast, setStatusBar,
     contentFormat, isInArray,
     timestampToTime, compareDate,
-    setAppBrightness
+    setAppBrightness, currentDayDate
 } from "../../common/Tool";
 
-type Props = {};
+type Props = {
+    getChapter: () => void,
+    isFocused: ?boolean
+};
 
 type State = {};
 
 class Reader extends BaseComponent<Props, State>{
+    static defaultProps = {
+        isFocused: false,
+    };
     constructor(props){
         super(props);
         this.state = {
@@ -53,11 +61,18 @@ class Reader extends BaseComponent<Props, State>{
             focusStatus: true,
 
             content: [],
+            // contentOriginal: [],
             title: '',
             currentPage: 0,
             nextPage: null,
             prevPage: null,
             chaptersCount: 0,
+
+            // 本地缓存系列
+            chapterContentArr: [],
+            chapterTitleArr: [],
+            chapterIndexArr: [],
+            chapterHexIdArr: [],
 
             nextPageCache: null,
             prevPageCache: null,
@@ -83,6 +98,8 @@ class Reader extends BaseComponent<Props, State>{
             readerModelValue: false,
             readerModelText: '日间模式',
             readerModelIcon: readerImg.sun,
+            // 阅读的亮度值
+            brightnessValue: 0,
 
             contentStatus: true,
             buySelectStatus: true,
@@ -90,11 +107,15 @@ class Reader extends BaseComponent<Props, State>{
             isVip: false,
             vipChapterIndex: 0,
 
-            forward: false,
+            forward: true, // 向前阅读
+            deviationCount: 0,
 
             statusBarHidden: true,
             statusBarBackgroundColor: BackgroundColor.bg_fff,
             barStyle: 'dark-content',
+
+            // 滑动状态
+            slideState: false,
         };
         this.commentsText = '';
         this.animateds = {
@@ -117,17 +138,33 @@ class Reader extends BaseComponent<Props, State>{
         this.toastConfig = { duration: 3000, position: Toast.positions.CENTER };
         this.gestureConfig = {
             velocityThreshold: 0.1,
-            directionalOffsetThreshold: 80
+            directionalOffsetThreshold: 20
         };
         this.timeUpdate = Date.now();
-        this.count = 0 ;          // 偏移量临界值
-        this.pageArr = []; // 所有章节页数
-        this.pages = 0;
+        this.readerTime = Date.now();
         this.errorTimeUpdated = Date.now();
-        this.batteryLevel = 0; // 设备电量值
-        this.rightSlideValue = 0;
+        // 偏移量临界值
+        this.count = 0 ;
+        // 所有章节页数
+        this.pageArr = [];
+        this.pages = 0;
+        // 设备电量值
+        this.batteryLevel = 0;
+        // 章节的变化数组
+        this.chapterChangeArr = [];
+        // 当前阅读的偏移宽度值
+        this.x = 0;
+        this.index = 0;
+        // 阅读时间
+        this.readerCurrentTiem = 0;
     }
-    async componentWillMount() {
+    componentDidMount() {
+        // 获取当前阅读时间
+        this.readerCurrentTiem = currentDayDate();
+
+        // 初始动画设置
+        this.animatedStartSet();
+
         // vip
         this._vip();
 
@@ -142,18 +179,15 @@ class Reader extends BaseComponent<Props, State>{
 
         // 阅读模式
         this._modeAutoChange();
-    }
-    componentDidMount() {
-        // 初始动画设置
-        this.animateds.header.top.setValue(verticalScale(-58));
-        this.animateds.footer.bottom.setValue(verticalScale(-65));
-        this.animateds.footer.fontSetBottom.setValue(verticalScale(-190.67));
-
-        // 软键盘监听
-        // this._keyboardHide = Keyboard.addListener('keyboardDidHide',this._keyboardDidHideHandler.bind(this));
 
         // 初始获取章节数据
         this.commonFetchData(this.props);
+
+        // 还原本地action
+        this.props.updateChapter && this.props.updateChapter(false);
+
+        // 软键盘监听
+        // this._keyboardHide = Keyboard.addListener('keyboardDidHide',this._keyboardDidHideHandler.bind(this));
     }
     componentWillReceiveProps(nextProps) {
         super.componentWillReceiveProps(nextProps);
@@ -180,18 +214,43 @@ class Reader extends BaseComponent<Props, State>{
             this.timeUpdate = nextProps.articleTimeUpdated;
             this._chapterDataProcessing(nextProps);
         }
-
-        // 评论成功后处理
-        // if(nextProps.comments && this.timeUpdate < nextProps.commentsTimeUpdated){
-        //     this.timeUpdate = Date.now();
-        //     infoToast && infoToast("评论成功");
-        // }
     }
-    componentWillUnmount() {
+    async componentWillUnmount() {
         // this._keyboardHide && this._keyboardHide.remove();
+        // setStatusBarHidden && setStatusBarHidden(false);
+        // this.setState({statusBarControl: false});
+
         setStatusBar && setStatusBar(BackgroundColor.bg_fff, true, 'dark-content');
-        //setStatusBarHidden && setStatusBarHidden(false);
-        this.setState({statusBarControl: false});
+
+        const { navigation } = this.props;
+        const bookHexId = navigation.getParam('bookHexId');
+
+        fineCommonSave && fineCommonSave(
+            'allBookCapter',
+            bookHexId + 'currentChapter',
+            {
+                content: this.state.content,
+                x: this.x,
+                sourceSiteIndex: this.state.sourceSiteIndex,
+                chaptersCount: this.state.chaptersCount,
+                bookTitle: this.state.bookTitle,
+                chapterChangeArr: this.chapterChangeArr,
+                count: this.count,
+                pages: this.pages,
+                index: this.index,
+                // contentOriginal: this.state.contentOriginal,
+                chapterContentArr: this.state.chapterContentArr,
+                chapterTitleArr: this.state.chapterTitleArr,
+                chapterIndexArr: this.state.chapterIndexArr,
+                chapterHexIdArr: this.state.chapterHexIdArr,
+            }
+        );
+    }
+    // 设置动画初始设置 - function
+    animatedStartSet(){
+        this.animateds.header.top.setValue(verticalScale(-44));
+        this.animateds.footer.bottom.setValue(verticalScale(-65));
+        this.animateds.footer.fontSetBottom.setValue(verticalScale(-254.23)); // 190.67
     }
     // 字体设置 - 本地缓存 - function
     async _fontSet(){
@@ -222,6 +281,7 @@ class Reader extends BaseComponent<Props, State>{
     // 设置日间或者夜间模式 - function
     async _modeAutoChange(){
         let mode = await commonLoad('modeChange');
+        let appBrightness = await commonLoad('appBrightness');
 
         if(mode){
             // 模式初始设置
@@ -230,11 +290,20 @@ class Reader extends BaseComponent<Props, State>{
                 readerModelText : mode.value ? '夜间模式' : '日间模式',
                 readerModelIcon : mode.value ? readerImg.moon : readerImg.sun,
                 // readerThemeIndex: mode.value ? 0 : 1,
+                brightnessValue : mode.value ? 0.05 : 0.20,
             });
+        }
+        else{
+            this.setState({brightnessValue : 0.20});
+        }
+
+        if(appBrightness){
+            this.setState({brightnessValue : appBrightness.value});
         }
     }
     // 章节相关数据处理 - function
     _chapterDataProcessing(nextProps){
+        const { navigation } =  nextProps;
         const chapter = nextProps.article.chapter;
         const book = nextProps.article.book;
         const bookTitle = book && book.title;
@@ -243,8 +312,11 @@ class Reader extends BaseComponent<Props, State>{
         const sourceSiteIndex = chapter && chapter.sourceSiteIndex;
         const title = chapter && chapter.title;
         const { fontSize, fontLineHeight } = this.state;
+        const direct = navigation.getParam('direct');
+        const currentChapterHexId = chapter && chapter.hexId;
+        let _content = content || [];
 
-        let obj = this._formatChapter(content, sourceSiteIndex, title, fontSize, fontLineHeight);
+        let obj = this._formatChapter(content, sourceSiteIndex, currentChapterHexId, title, fontSize, fontLineHeight);
 
         if(obj.length === 0 && chapter.result){
             obj.push({
@@ -266,30 +338,57 @@ class Reader extends BaseComponent<Props, State>{
             this.count = width;
         }
 
-        // if(!this.state.forward){
-        //     this.setState({
-        //         content: this.state.content.concat(obj),
-        //         // nextPageCache: chapter.turnPage.next,
-        //     });
-        // }
-        // else{
-        //     this.setState({
-        //         content: obj.concat(this.state.content),
-        //         // prevPageCache: chapter.turnPage.prev,
-        //     });
-        //     this.refs['flatListRef'] && this.refs['flatListRef'].scrollToOffset({animated: false, offset: (obj.length) * width });
-        // }
+        this.chapterChangeArr.slice();
+
+        // 向左阅读 - 默认
+        if(this.state.forward){
+            this.state.chapterContentArr.push(_content);
+            this.state.chapterTitleArr.push(chapter.title);
+            this.state.chapterIndexArr.push(sourceSiteIndex);
+            this.state.chapterHexIdArr.push(chapter.hexId);
+
+            this.setState({
+                // contentOriginal: this.state.contentOriginal.concat(_content),
+                content: this.state.content.concat(obj),
+                deviationCount: (this.state.content).length !== 0 ? ((this.state.content).length - 1) * width : 0,
+                chapterContentArr: this.state.chapterContentArr,
+                chapterTitleArr: this.state.chapterTitleArr,
+                chapterIndexArr: this.state.chapterIndexArr,
+                chapterHexIdArr: this.state.chapterHexIdArr,
+        });
+            this.chapterChangeArr.push(chapter.turnPage);
+        }
+
+        // 向右阅读
+        if(!this.state.forward){
+            this.state.chapterContentArr.splice(0, 0, _content);
+            this.state.chapterTitleArr.splice(0, 0, chapter.title);
+            this.state.chapterIndexArr.splice(0, 0, sourceSiteIndex);
+            this.state.chapterHexIdArr.splice(0, 0, chapter.hexId);
+
+            this.setState({
+                // contentOriginal: _content.concat(this.state.contentOriginal),
+                content: obj.concat(this.state.content),
+                deviationCount: (obj.length) * width,
+                chapterContentArr: this.state.chapterContentArr,
+                chapterTitleArr: this.state.chapterTitleArr,
+                chapterIndexArr: this.state.chapterIndexArr,
+                chapterHexIdArr: this.state.chapterHexIdArr,
+            });
+            this.chapterChangeArr.splice(0, 0, chapter.turnPage);
+        }
 
         this.setState({
-            content: this.state.content.concat(obj),
-            sourceSiteIndex: sourceSiteIndex,
-            chaptersCount: chaptersCount,
+            // content: this.state.content.concat(obj),
             prevPage: chapter && chapter.turnPage.prev,
             nextPage: chapter && chapter.turnPage.next,
+            sourceSiteIndex: sourceSiteIndex,
+            chaptersCount: chaptersCount,
             bookTitle: bookTitle,
             title: chapter && chapter.title,
             vipChapterIndex: book && book.vipChapterIndex,
             currentChapterHexId: chapter && chapter.hexId,
+            isSlideLoading: false,
         });
     }
     // vip - function
@@ -318,7 +417,7 @@ class Reader extends BaseComponent<Props, State>{
         });
     }
     // 章节处理 - function
-    _formatChapter(content, num, title, fontSize, fontLineHeight){
+    _formatChapter(content, num, currentChapterHexId, title, fontSize, fontLineHeight){
         let _arr = [];
         let array = contentFormat(content, fontSize, fontLineHeight);
 
@@ -330,18 +429,20 @@ class Reader extends BaseComponent<Props, State>{
                 index: index + 1,
                 length: array.length,
                 result: null,
+                currentChapterHexId: currentChapterHexId
             };
+
             _arr.push(_chapterInfo);
         });
 
         return _arr;
     }
     // 公共获取章节数据 - function
-    async commonFetchData(props){
-        const { getChapter, navigation } = props;
-        const hexId = navigation.getParam('hexId');
+    async commonFetchData(props: Object){
+        const { getChapter, navigation } = props || this.props;
+        const chapterHexId = navigation.getParam('chapterHexId');
         const bookId = navigation.getParam('bookId');
-        const direct = navigation.getParam('direct');
+        // const direct = navigation.getParam('direct');
         // const value = navigation.getParam('value') || '0';
         const bookHexId = navigation.getParam('bookHexId');
 
@@ -350,29 +451,76 @@ class Reader extends BaseComponent<Props, State>{
         let val = await this._chapterAutoDeductions();
         // let condition = isInArray(this.pageArr, 1);
 
-        //if(!condition){
-            this.setState({
-                content: [],
-                sourceSiteIndex: 0,
-                chaptersCount: 0,
-                prevPage: null,
-                nextPage: null,
-                buySelectStatus: buy ? buy.buySelectStatus : true,
-            });
+        // 拿去本地章节内容
+        // let local = await commonLoad(bookHexId + 'localChapter');
 
-            this.pageArr = [];
-            this.count = 0;
-            this.pages = 0;
+        let local = await fineCommonLoad(
+            'allBookCapter',
+            bookHexId + 'currentChapter'
+        );
+
+        console.log('dataTest----------', local);
+
+        this.setState({
+            content: [],
+            sourceSiteIndex: 0,
+            chaptersCount: 0,
+            prevPage: null,
+            nextPage: null,
+            buySelectStatus: buy ? buy.buySelectStatus : true,
+            deviationCount: 0,
+            forward: true,
+            chapterContentArr: [],
+            chapterTitleArr: [],
+            chapterIndexArr: [],
+            chapterHexIdArr: [],
+        });
+
+        this.pageArr = [];
+        this.chapterChangeArr = [];
+        this.count = 0;
+        this.pages = 0;
+        this.index = 0;
+
+        // console.log('obj',local, direct);
+
+        // 直接 - 3
+        //if(direct){
+            if(local){
+                this.setState({
+                    // bookTitle: local.bookTitle,
+                    chaptersCount: local.chaptersCount,
+                    // sourceSiteIndex: local.sourceSiteIndex,
+                    // content: local.content,
+                    deviationCount: local.x,
+                    // contentOriginal: local.contentOriginal,
+                    chapterContentArr: local.chapterContentArr,
+                    chapterTitleArr: local.chapterTitleArr,
+                    chapterIndexArr: local.chapterIndexArr,
+                    chapterHexIdArr: local.chapterHexIdArr,
+                });
+
+                this.chapterChangeArr = local.chapterChangeArr;
+                // this.count = local.count;
+                // this.pages = local.pages;
+                this.x = local.x;
+                this.index = local.index;
+
+                this._commonReaderStyle(this.state.fontSize, this.state.fontLineHeight, local, true);
+
+                // this.props.readerPosition && this.props.readerPosition(local.x);
+                return;
+            }
+            //else {
+                // getChapter && getChapter(hexId, false, val, bookHexId);
+                getChapter && getChapter(bookHexId, bookId, chapterHexId);
+            //}
         //}
 
-        // 直接或继续阅读
-        if(direct){
-            getChapter && getChapter(hexId, false, val, bookHexId);
-        }
-        // 跳章节阅读
-        else{
-            getChapter && getChapter(hexId, bookId, val, bookHexId);
-        }
+        // 跳 - 2
+        // if(!direct){
+        //     getChapter && getChapter(hexId, bookId, val, bookHexId);
+        // }
     }
     // 获取收费章节 - function
     _fetchChapterData(val){
@@ -382,8 +530,10 @@ class Reader extends BaseComponent<Props, State>{
         const bookHexId = book ? book.hexId : '';
         const bookId = book ? book.id : '';
         const currentChapterHexId = chapter ? chapter.hexId : '';
+        const chapterHexId = currentChapterHexId;
 
-        getChapter && getChapter(currentChapterHexId, bookId, val, bookHexId);
+        // getChapter && getChapter(currentChapterHexId, bookId, val, bookHexId);
+        getChapter(bookHexId, bookId, chapterHexId);
     }
     // 关闭评论监听 - function
     _keyboardDidHideHandler(){
@@ -415,24 +565,24 @@ class Reader extends BaseComponent<Props, State>{
             AnimatedTiming(this.animateds.header.top, 0),
             AnimatedTiming(this.animateds.footer.bottom, 0)
         ]).start(() => {
-            this.setState({
-                barStyle: 'light-content',
-                statusBarHidden: false,
-                statusBarBackgroundColor: BackgroundColor.bg_000000_7,
-            });
+            // this.setState({
+            //     barStyle: 'light-content',
+            //     statusBarHidden: false,
+            //     statusBarBackgroundColor: BackgroundColor.bg_000000_7,
+            // });
         });
     }
     // 关闭设置 - 动画 - function
     setAnimateClose(){
         Animated.parallel([
-            AnimatedTiming(this.animateds.header.top, verticalScale(-58)),
+            AnimatedTiming(this.animateds.header.top, verticalScale(-44)),
             AnimatedTiming(this.animateds.footer.bottom, verticalScale(-65))
         ]).start(() => {
-            this.setState({
-                barStyle: 'dark-content',
-                statusBarHidden: true,
-                statusBarBackgroundColor: BackgroundColor.bg_fff,
-            });
+            // this.setState({
+            //     barStyle: 'dark-content',
+            //     statusBarHidden: true,
+            //     statusBarBackgroundColor: BackgroundColor.bg_fff,
+            // });
         });
     }
     // 打开字体设置 - 动画 - function
@@ -443,7 +593,7 @@ class Reader extends BaseComponent<Props, State>{
     // 关闭字体设置 - 动画 - function
     fontSetAnimateClose(){
         this.setState({controlName: ''});
-        Animated.parallel([AnimatedTiming(this.animateds.footer.fontSetBottom, verticalScale(-190.67))]).start();
+        Animated.parallel([AnimatedTiming(this.animateds.footer.fontSetBottom, verticalScale(-254.23))]).start(); // 190.67
     }
     // 去购买 - function
     async _goBuy(){
@@ -514,10 +664,11 @@ class Reader extends BaseComponent<Props, State>{
             return infoToast && infoToast('已是最后一章');
         }
 
-        const currentChapterHexId = nextPage.hexId;
+        const chapterHexId = nextPage.hexId;
         const bookId = nextPage.bookId;
 
-        getChapter && getChapter(currentChapterHexId, bookId, val, bookHexId);
+        // getChapter && getChapter(currentChapterHexId, bookId, val, bookHexId);
+        getChapter(bookHexId, bookId, chapterHexId);
     }
     // 立即阅读下一章 - function
     _immediatelyReaderNextChapter(){
@@ -549,15 +700,106 @@ class Reader extends BaseComponent<Props, State>{
             <View style={[styles.buckleContent, Styles.flexCenter]}>
                 {
                     isLogin ?
-                    <View>
-                        {
-                            parseInt(result.value) !== 13 &&
-                            <View style={[styles.buckleTitle, Styles.flexCenter]}>
-                                <Text style={[Fonts.fontFamily, Fonts.fontSize16, {color: this.state.fontSColor}]}>需要购买后阅读</Text>
-                                <Text style={[Fonts.fontFamily, Fonts.fontSize16, {color: this.state.fontSColor}]}>感谢对正版阅读的支持</Text>
+                        <View>
+                            {
+                                parseInt(result.value) !== 13 &&
+                                <View style={[styles.buckleTitle, Styles.flexCenter]}>
+                                    <Text style={[Fonts.fontFamily, Fonts.fontSize16, {color: this.state.fontSColor}]}>需要购买后阅读</Text>
+                                    <Text style={[Fonts.fontFamily, Fonts.fontSize16, {color: this.state.fontSColor}]}>感谢对正版阅读的支持</Text>
+                                </View>
+                            }
+                            <View style={[styles.buckleButs, Styles.flexCenter]}>
+                                {
+                                    parseInt(result.value) === 13 &&
+                                    <View>
+                                        <View style={[Styles.flexCenter]}>
+                                            <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.gray_404040]}>本章节暂无数据内容</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            activeOpacity={0.75}
+                                            style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(40)}]}
+                                            onPress={this._immediatelyReaderNextChapter.bind(this)}
+                                        >
+                                            <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>立即阅读下一章</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                }
+                                {
+                                    parseInt(result.value) !== 13 &&
+                                    <Text style={[Fonts.fontFamily, Fonts.fontSize14, Colors.gray_404040]}>
+                                        价格： <Text style={[Colors.orange_f3916b]}>{ balance ? balance.chapterAmount : 0 }</Text>书币
+                                        余额：<Text style={[Colors.orange_f3916b]}>{ balance ? balance.balance : 0 }</Text>书币
+                                    </Text>
+                                }
+                                {
+                                    parseInt(result.value) === 100 &&
+                                    <TouchableOpacity
+                                        activeOpacity={0.75}
+                                        style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(25)}]}
+                                        onPress={this._goBuy.bind(this)}
+                                    >
+                                        <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>购买</Text>
+                                    </TouchableOpacity>
+                                }
+                                {
+                                    (balance !== null && parseInt(balance.balance) < parseInt(balance.chapterAmount)) &&
+                                    <TouchableOpacity
+                                        activeOpacity={0.75}
+                                        style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(25)}]}
+                                        onPress={this._recharge.bind(this)}
+                                    >
+                                        <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>充值</Text>
+                                    </TouchableOpacity>
+                                }
+                                <TouchableOpacity
+                                    activeOpacity={0.75}
+                                    style={[styles.buckleBut,Styles.flexCenter, {marginTop: moderateScale(25)}]}
+                                    onPress={this._freeBookMoney.bind(this)}
+                                >
+                                    <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.orange_f3916b]}>免费领取书币</Text>
+                                </TouchableOpacity>
+                                {
+                                    parseInt(result.value) === 100 &&
+                                    <TouchableOpacity
+                                        activeOpacity={0.5}
+                                        style={[styles.gmBox, Styles.flexCenter]}
+                                        onPress={this._autoBuyChapter.bind(this)}
+                                    >
+                                        {
+                                            this.state.buySelectStatus ?
+                                                <Image
+                                                    source={bookshelf.select}
+                                                    style={[styles.CollectBookSelectIcon, Img.resizeModeContain, {marginRight: moderateScale(4)}]}
+                                                /> :
+                                                <View style={[styles.selectCyc, {marginRight: moderateScale(4)}]}/>
+                                        }
+                                        <Text style={[Fonts.fontFamily, Fonts.fontSize14, {color: '#ccc'}]}>自动购买收费章节</Text>
+                                    </TouchableOpacity>
+                                }
                             </View>
-                        }
-                        <View style={[styles.buckleButs, Styles.flexCenter]}>
+                        </View> :
+                        <View>
+                            {/*<View style={[styles.buckleTitle, Styles.flexCenter]}>*/}
+                            {/*<Text*/}
+                            {/*style={[Fonts.fontFamily, Fonts.fontSize16, {color: this.state.fontSColor}]}*/}
+                            {/*>*/}
+                            {/*本章节需要登录后才能观看哦*/}
+                            {/*</Text>*/}
+                            {/*</View>*/}
+                            {/*<TouchableOpacity*/}
+                            {/*activeOpacity={0.75}*/}
+                            {/*style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(40)}]}*/}
+                            {/*onPress={this._loginPage.bind(this)}*/}
+                            {/*>*/}
+                            {/*<Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>立即登录</Text>*/}
+                            {/*</TouchableOpacity>*/}
+                            {/*<TouchableOpacity*/}
+                            {/*activeOpacity={0.75}*/}
+                            {/*style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(30)}]}*/}
+                            {/*onPress={this._goBack.bind(this)}*/}
+                            {/*>*/}
+                            {/*<Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>下次登录</Text>*/}
+                            {/*</TouchableOpacity>*/}
                             {
                                 parseInt(result.value) === 13 &&
                                 <View>
@@ -573,33 +815,6 @@ class Reader extends BaseComponent<Props, State>{
                                     </TouchableOpacity>
                                 </View>
                             }
-                            {
-                                parseInt(result.value) !== 13 &&
-                                <Text style={[Fonts.fontFamily, Fonts.fontSize14, Colors.gray_404040]}>
-                                    价格： <Text style={[Colors.orange_f3916b]}>{ balance ? balance.chapterAmount : 0 }</Text>书币
-                                    余额：<Text style={[Colors.orange_f3916b]}>{ balance ? balance.balance : 0 }</Text>书币
-                                </Text>
-                            }
-                            {
-                                parseInt(result.value) === 100 &&
-                                <TouchableOpacity
-                                    activeOpacity={0.75}
-                                    style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(25)}]}
-                                    onPress={this._goBuy.bind(this)}
-                                >
-                                    <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>购买</Text>
-                                </TouchableOpacity>
-                            }
-                            {
-                                (balance !== null && parseInt(balance.balance) < parseInt(balance.chapterAmount)) &&
-                                <TouchableOpacity
-                                    activeOpacity={0.75}
-                                    style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(25)}]}
-                                    onPress={this._recharge.bind(this)}
-                                >
-                                    <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>充值</Text>
-                                </TouchableOpacity>
-                            }
                             <TouchableOpacity
                                 activeOpacity={0.75}
                                 style={[styles.buckleBut,Styles.flexCenter, {marginTop: moderateScale(25)}]}
@@ -607,49 +822,7 @@ class Reader extends BaseComponent<Props, State>{
                             >
                                 <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.orange_f3916b]}>免费领取书币</Text>
                             </TouchableOpacity>
-                            {
-                                parseInt(result.value) === 100 &&
-                                <TouchableOpacity
-                                    activeOpacity={0.5}
-                                    style={[styles.gmBox, Styles.flexCenter]}
-                                    onPress={this._autoBuyChapter.bind(this)}
-                                >
-                                    {
-                                        this.state.buySelectStatus ?
-                                            <Image
-                                                source={bookshelf.select}
-                                                style={[styles.CollectBookSelectIcon, Img.resizeModeContain, {marginRight: moderateScale(4)}]}
-                                            /> :
-                                            <View style={[styles.selectCyc, {marginRight: moderateScale(4)}]}/>
-                                    }
-                                    <Text style={[Fonts.fontFamily, Fonts.fontSize14, {color: '#ccc'}]}>自动购买收费章节</Text>
-                                </TouchableOpacity>
-                            }
                         </View>
-                    </View> :
-                    <View>
-                        <View style={[styles.buckleTitle, Styles.flexCenter]}>
-                            <Text
-                                style={[Fonts.fontFamily, Fonts.fontSize16, {color: this.state.fontSColor}]}
-                            >
-                                本章节需要登录后才能观看哦
-                            </Text>
-                        </View>
-                        <TouchableOpacity
-                            activeOpacity={0.75}
-                            style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(40)}]}
-                            onPress={this._loginPage.bind(this)}
-                        >
-                            <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>立即登录</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            activeOpacity={0.75}
-                            style={[styles.buckleBut,Styles.flexCenter,{backgroundColor: BackgroundColor.bg_f3916b, marginTop: moderateScale(30)}]}
-                            onPress={this._goBack.bind(this)}
-                        >
-                            <Text style={[Fonts.fontFamily, Fonts.fontSize16, Colors.white_FFF]}>下次登录</Text>
-                        </TouchableOpacity>
-                    </View>
                 }
             </View>
         );
@@ -664,49 +837,52 @@ class Reader extends BaseComponent<Props, State>{
         const { getChapter, navigation } = this.props;
         const bookId = navigation.getParam('bookId');
         const bookHexId = navigation.getParam('bookHexId');
-
-        // const vipChapterIndex = (article && article.book && article.book.vipChapterIndex) || 0;
-        // const sourceSiteIndex = (article && article.chapter && article.chapter.sourceSiteIndex) || 0;
-        // const confirmPay = parseInt(sourceSiteIndex) > parseInt(vipChapterIndex) ? '1' : '0';
-
         let val = this.state.buySelectStatus ? '1' : '0';
-        let x = e.nativeEvent.contentOffset.x;
+
+        // let x = e.nativeEvent.contentOffset.x;
+        let x = e;
 
         if(this.count === 0){
             this.count = (this.pages - 1) * width;
         }
 
-        // 重新获取电池电量
-        this._getDeviceBatteryLevel();
+        // 当前阅读的偏移宽度值
+        this.x = x;
 
-        console.log('handleScroll', x, this.count);
+        // console.log('handleScroll', x, this.count);
 
         // 获取到下一章数据
         if(x >= this.count){
             this.count += (this.pages - 1) * width;
+            this.setState({forward: true});
 
-            this.setState({forward: false});
+            const nextObj = this.chapterChangeArr[this.chapterChangeArr.length - 1];
 
-            if(this.state.nextPage !== null){
-                const nextHexId = this.state.nextPage.hexId;
-                getChapter && getChapter(nextHexId, bookId, val, bookHexId);
+            if(nextObj.next !== null){
+                const chapterHexId = nextObj.next.hexId;
+                // getChapter && getChapter(nextHexId, bookId, val, bookHexId);
+                getChapter(bookHexId, bookId, chapterHexId);
             }
-            else{
+
+            if(nextObj.next === null){
                 infoToast && infoToast('已是最后一页', this.toastConfig);
             }
         }
 
         // 获取上一章数据
         if(x === 0){
+            this.setState({forward: false});
 
-            this.setState({forward: true});
+            const prevObj = this.chapterChangeArr[0];
 
             // 获取上一页数据
-            if(this.state.prevPage !== null){
-                const prevHexId = this.state.prevPage.hexId;
-                getChapter && getChapter(prevHexId, bookId, val, bookHexId);
+            if(prevObj.prev !== null){
+                const chapterHexId = prevObj.prev.hexId;
+                // getChapter && getChapter(prevHexId, bookId, val, bookHexId);
+                getChapter(bookHexId, bookId, chapterHexId);
             }
-            else{
+
+            if(prevObj.prev === null){
                 infoToast && infoToast('已是第一页', this.toastConfig);
             }
         }
@@ -728,107 +904,213 @@ class Reader extends BaseComponent<Props, State>{
             );
         }
 
+        // console.log('renderReaderFlatList', content, this.state);
+
         return (
-            <FlatList
-                ref={'flatListRef'}
-                data={content}
-                horizontal={true}
-                pagingEnabled={true}
-                keyExtractor={(item, index) => index + ''}
-                showsHorizontalScrollIndicator={false}
-                showsVerticalScrollIndicator={false}
-                renderItem={this.renderReaderRow.bind(this)}
-                onScroll={(e) => this.handleScroll(e)}
-                keyboardDismissMode={'on-drag'}
-                onScrollEndDrag={this._onScrollEndDrag.bind(this)}
-            />
+            <Swiper
+                index={this.state.deviationCount / width}
+                bounces={false}
+                loop={false}
+                showsButtons={false}
+                showsPagination={false}
+                ref={ref => this.swiper = ref}
+                onMomentumScrollEnd={this._onMomentumScrollEnd.bind(this)}
+                onIndexChanged={this._onIndexChanged.bind(this)}
+                //onTouchStart={this._onTouchStart.bind(this)}
+            >
+                { content.map((item, index) => this.renderReaderRow({item, index})) }
+            </Swiper>
         );
 
+        // return (
+        //     <FlatList
+        //         initialNumToRender={this.state.content.length}
+        //         // progressViewOffset={this.state.deviationCount}
+        //         // initialScrollIndex={this.state.deviationCount / width}
+        //         ref={ref => this.flatListRef = ref}
+        //         data={content}
+        //         horizontal={true}
+        //         pagingEnabled={true}
+        //         keyExtractor={(item, index) => index + ''}
+        //         showsHorizontalScrollIndicator={false}
+        //         showsVerticalScrollIndicator={false}
+        //         renderItem={this.renderReaderRow.bind(this)}
+        //         onScroll={(e) => this.handleScroll(e)}
+        //         keyboardDismissMode={'on-drag'}
+        //         onScrollEndDrag={this._onScrollEndDrag.bind(this)}
+        //         getItemLayout={(data, index) => ({length: width, offset: width * index, index})}
+        //     />
+        // );
+
+    }
+    _onTouchStart(e){
+        const { getChapter, navigation } = this.props;
+        const bookId = navigation.getParam('bookId');
+        const bookHexId = navigation.getParam('bookHexId');
+        let val = this.state.buySelectStatus ? '1' : '0';
+        const prevObj = this.chapterChangeArr[0];
+
+        if(this.index === 0 && this.state.forward){
+            this.setState({forward: false});
+
+            // 获取上一页数据
+            if(prevObj.prev !== null){
+                const chapterHexId = prevObj.prev.hexId;
+                // getChapter && getChapter(prevHexId, bookId, val, bookHexId);
+                // getChapter(bookHexId, bookId, chapterHexId);
+            }
+
+            if(prevObj.prev === null){
+                infoToast && infoToast('已是第一页', this.toastConfig);
+            }
+        }
+    }
+    _onMomentumScrollEnd(e, state){
+        let x = state.offset.x;
+
+        // console.log('_onMomentumScrollEnd', x);
+
+        // 重新获取电池电量
+        this._getDeviceBatteryLevel();
+
+        // 更新当前阅读时间
+        this.readerCurrentTiem = currentDayDate();
+
+        this.handleScroll(x);
+    }
+    _onIndexChanged(index){
+        this.index = index;
+
+        if(index !== 0){
+            this.setState({forward: false});
+        }
     }
     // 拖拽结束 - function
     _onScrollEndDrag(e){
-        // const { getChapter, navigation } = this.props;
-        // let x = e.nativeEvent.contentOffset.x;
-        // const bookId = navigation.getParam('bookId');
-        // const bookHexId = navigation.getParam('bookHexId');
-        // let val = this.state.buySelectStatus ? '1' : '0';
-        //
-        // if(x === 0 && !this.state.forward){
-        //     this.setState({forward: true});
-        //
-        //     // 获取上一页数据
-        //     if(this.state.prevPage !== null){
-        //         const prevHexId = this.state.prevPage.hexId;
-        //         getChapter && getChapter(prevHexId, bookId, val, bookHexId);
-        //     }
-        //     else{
-        //         infoToast && infoToast('已是第一页', this.toastConfig);
-        //     }
-        // }
+        const { getChapter, navigation } = this.props;
+        let x = e.nativeEvent.contentOffset.x;
+        const bookId = navigation.getParam('bookId');
+        const bookHexId = navigation.getParam('bookHexId');
+        let val = this.state.buySelectStatus ? '1' : '0';
+        const prevObj = this.chapterChangeArr[0];
+
+        if(x === 0 && this.state.forward && this.x === 0){
+            this.setState({forward: false});
+
+            // 获取上一页数据
+            if(prevObj.prev !== null){
+                const chapterHexId = prevObj.prev.hexId;
+                // getChapter && getChapter(prevHexId, bookId, val, bookHexId);
+                getChapter(bookHexId, bookId, chapterHexId);
+            }
+            else{
+                infoToast && infoToast('已是第一页', this.toastConfig);
+            }
+        }
     }
-    // 阅读渲染 - demo
-    renderReaderRow({item}){
+    _contentText(item){
         const { article } = this.props;
-        const comFontStyles = [Fonts.fontFamily, Fonts.fontSize14, Colors.gray_808080];
+        const comFontStyles = [Fonts.fontFamily, Fonts.fontSize12, Colors.gray_808080];
         const chaptersCount = article ? article.chaptersCount : 0;
-        const time = moment().format("HH:MM");
         const { fontLineHeight, fontSize, fontSColor } = this.state;
         const batteryLevelWidth: number = this.batteryLevel * moderateScale(17);
         const batteryLevelPercentage = accounting.toFixed(Number((this.batteryLevel * 100)), 0);
-        // const commonColor = batteryLevelPercentage <= moderateScale(10) ? 'red' : '#66CC99';
         const commonColor = batteryLevelPercentage <= moderateScale(10) ? 'red' : '#999999';
 
+        // console.log('_contentText', item);
+
         return (
-            <View style={[Styles.row,{zIndex: 10}]}>
-                <TouchableOpacity
-                    activeOpacity={1}
-                    style={[{height: height, width: width}]}
-                    onPress={this.readerSetting.bind(this)}
-                >
-                    <View style={[{flex: 1, justifyContent: 'space-between'}]}>
-                        <View style={[styles.readerRow, Styles.paddingHorizontal15]}>
-                            <Text style={comFontStyles}>{ item.title || '' }</Text>
-                            <View style={[Styles.row]}>
-                                <Text style={comFontStyles}>{ time }</Text>
-                                <View style={[styles.batteryLevelBox, {marginTop: moderateScale(6)}]}>
-                                    <View style={[styles.batteryLevelInner, {borderColor: commonColor}]}>
-                                        <View style={[styles.batteryLevel, {width: batteryLevelWidth, backgroundColor: commonColor}]}/>
-                                    </View>
-                                    <View style={[styles.batterHeader, {backgroundColor: commonColor, marginTop: moderateScale(-2)}]}/>
+            <TouchableOpacity
+                activeOpacity={1}
+                style={[{height: height, width: width}]}
+                onPress={this.readerSetting.bind(this)}
+            >
+                <View style={[{flex: 1, justifyContent: 'space-between'}]}>
+                    <View style={[styles.readerRow, Styles.paddingHorizontal15]}>
+                        <Text style={comFontStyles}>{ item.title || '' }</Text>
+                        <View style={[Styles.row]}>
+                            <Text style={comFontStyles}>{ this.readerCurrentTiem }</Text>
+                            <View style={[styles.batteryLevelBox, {marginTop: moderateScale(4.25)}]}>
+                                <View style={[styles.batteryLevelInner, {borderColor: commonColor}]}>
+                                    <View style={[styles.batteryLevel, {width: batteryLevelWidth, backgroundColor: commonColor}]}/>
                                 </View>
+                                <View style={[styles.batterHeader, {backgroundColor: commonColor, marginTop: moderateScale(-2)}]}/>
                             </View>
                         </View>
-                        <View style={{flex: 1,alignSelf:'center'}}>
-                            {
-                                item.result !== null ? this.renderRequestBalance(item.result) :
-                                    (item.content || []).map((value, index) => {
-                                        return (
-                                            <Text
-                                                key={index}
-                                                style={[Fonts.fontFamily,{color: fontSColor, fontSize: fontSize, lineHeight: fontLineHeight}]}
-                                            >
-                                                { value }
-                                            </Text>
-                                        )
-                                    })
-                            }
-                        </View>
-                        <View style={[styles.readerRow, Styles.paddingHorizontal15]}>
-                            <Text style={comFontStyles}>{ item.index } / { item.length }</Text>
-                            <Text style={comFontStyles}>{ item.num } / { chaptersCount }</Text>
-                        </View>
                     </View>
-                </TouchableOpacity>
+                    <View style={{flex: 1,alignSelf:'center'}}>
+                        {
+                            item.result !== null ? this.renderRequestBalance(item.result) :
+                                (item.content).map((value, index) => {
+                                    return (
+                                        <Text
+                                            key={index}
+                                            style={[Fonts.fontFamily,{color: fontSColor, fontSize: fontSize, lineHeight: fontLineHeight}]}
+                                        >
+                                            { value }
+                                        </Text>
+                                    );
+                                })
+                        }
+                    </View>
+                    <View style={[styles.readerRow, Styles.paddingHorizontal15]}>
+                        <Text style={comFontStyles}>{ item.index } / { item.length }</Text>
+                        <Text style={comFontStyles}>{ item.num } / { chaptersCount }</Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    }
+    // 阅读渲染 - demo
+    renderReaderRow({item, index}){
+        if(this.index === 0 && this.state.forward && (this.state.deviationCount / width) === 0){
+            return (
+                <GestureRecognizer
+                    key={index}
+                    style={[Styles.row, {zIndex: 10}]}
+                    onSwipeRight={(state) => this.onSwipeRight(state)}
+                    responderRelease={(evt, gestureState) => this.responderReleaseSlide(evt, gestureState)}
+                    config={this.gestureConfig}
+                >
+                    { this._contentText(item) }
+                </GestureRecognizer>
+            );
+        }
+
+        return (
+            <View key={index} style={[Styles.row, {zIndex: 10}]}>
+                { this._contentText(item) }
             </View>
         );
+    }
+    // text - function
+    textContent(content){
+        const { fontLineHeight, fontSize, fontSColor } = this.state;
+
+        if(content.length === 0){
+            return (
+                <Chrysanthemum/>
+            );
+        }
+
+        return content.map((value, index) => {
+            return (
+                <Text
+                    key={index}
+                    style={[Fonts.fontFamily,{color: fontSColor, fontSize: fontSize, lineHeight: fontLineHeight}]}
+                >
+                    { value }
+                </Text>
+            );
+        })
     }
     // 阅读内容 - demo
     renderReaderContent(){
         // return (
         //     <GestureRecognizer
         //         style={[styles.readerContainer]}
-        //         // onSwipeLeft={(state) => this.onSwipeLeft(state)}
         //         onSwipeRight={(state) => this.onSwipeRight(state)}
+        //         responderRelease={(evt, gestureState) => this.responderReleaseSlide(evt, gestureState)}
         //         config={this.gestureConfig}
         //     >
         //         { this.renderReaderFlatList() }
@@ -841,14 +1123,41 @@ class Reader extends BaseComponent<Props, State>{
             </View>
         );
     }
-    onSwipeLeft(gestureState) {
-        console.log('向左滑动',gestureState);
+    responderReleaseSlide(evt, gestureState){
+        if(gestureState.moveX !== 0 && this.state.slideState){
+            // console.log('获取上一章的数据');
+
+            const { getChapter, navigation } = this.props;
+            const bookId = navigation.getParam('bookId');
+            const bookHexId = navigation.getParam('bookHexId');
+            let val = this.state.buySelectStatus ? '1' : '0';
+            const prevObj = this.chapterChangeArr[0];
+
+            if(this.index === 0 && this.state.forward){
+                this.setState({
+                    forward: false,
+                });
+
+                // 获取上一页数据
+                if(prevObj.prev !== null){
+                    const chapterHexId = prevObj.prev.hexId;
+                    // getChapter && getChapter(prevHexId, bookId, val, bookHexId);
+                    getChapter(bookHexId, bookId, chapterHexId);
+                }
+
+                if(prevObj.prev === null){
+                    infoToast && infoToast('已是第一页', this.toastConfig);
+                }
+            }
+
+            this.setState({slideState: false});
+        }
     }
     onSwipeRight(gestureState) {
-
-        //if(this.count === 0){
-            console.log('向右滑动',gestureState);
-        //}
+        if(gestureState.dx !== 0 && this.index === 0 && this.state.forward){
+            // console.log('向右滑动', gestureState.dx);
+            this.setState({slideState: true});
+        }
     }
     // 返回 - function
     _goBack(){
@@ -950,11 +1259,13 @@ class Reader extends BaseComponent<Props, State>{
         // 夜间模式
         if(!this.state.readerModelValue){
             setAppBrightness(0.05);
+            commonSave && commonSave('appBrightness', { value: 0.05 });
         }
 
         // 日间模式
         if(this.state.readerModelValue){
             setAppBrightness(0.20);
+            commonSave && commonSave('appBrightness', { value: 0.20 });
         }
 
         // 本地缓存
@@ -967,12 +1278,15 @@ class Reader extends BaseComponent<Props, State>{
         const hexId = book ? book.hexId : '';
         const bookId = book ? book.id : '';
         const title = book ? book.title : '';
-        
+
+        // 点亮当前章节标题
+        this.props.lightChapterTitle && this.props.lightChapterTitle(this.state.content, this.x);
+
         // 关闭动画
         if(this.state.controlStatus) this.setAnimateClose();
         this.setState({controlStatus: !this.state.controlStatus});
 
-        //navigation && navigation.navigate('ChapterDirectory',{ hexId, bookId, title, type: 'bookmark' });
+        // navigation && navigation.navigate('ChapterDirectory',{ hexId, bookId, title, type: 'bookmark' });
         navigation && navigation.navigate('ChapterDirectory',{ hexId, bookId, title, type: 'chapter' });
     }
     // 字体尺寸控制 - function
@@ -998,10 +1312,37 @@ class Reader extends BaseComponent<Props, State>{
         }
 
         this.setState({fontSize});
-        this._fontAndPlateSet(fontSize, this.state.fontLineHeight);
+        this._commonReaderStyle(fontSize, this.state.fontLineHeight, this.state);
 
         // 本地缓存
         commonSave && commonSave('fontSet',{fontSize});
+    }
+    // 亮度控制 - function
+    brightnessControl(value){
+        this.setState({brightnessValue: value});
+        setAppBrightness && setAppBrightness(value);
+
+        // 把亮度值存在本地
+        commonSave && commonSave('appBrightness', { value });
+    }
+    // 滑动条 - demo
+    renderSlider(){
+        const value = this.state.brightnessValue;
+
+        return (
+            <Slider
+                minimumTrackTintColor={BackgroundColor.bg_f3916b}
+                maximumTrackTintColor={'rgba(255,255,255,0.7)'}
+                thumbTintColor={BackgroundColor.bg_f3916b}
+                thumbTouchSize={{width: scale(40),height: verticalScale(40)}}
+                trackStyle={{height: verticalScale(2)}}
+                thumbStyle={{width: scale(16), height: verticalScale(16), backgroundColor:'#FFF'}}
+                style={{height: verticalScale(40), width:'100%'}}
+                debugTouchArea={false}
+                value={value}
+                onValueChange={this.brightnessControl.bind(this)}
+            />
+        );
     }
     // 字体设置 - demo
     renderFooterFontSet(){
@@ -1010,6 +1351,13 @@ class Reader extends BaseComponent<Props, State>{
 
         return (
             <Animated.View style={[styles.readerFooterFontSetBar, {backgroundColor: BackgroundColor.bg_000000_7, bottom: animatedBottomValue}]}>
+                <View style={styles.readerFooterSBRow}>
+                    <View style={[styles.titleFont]}><Text style={comFontStyles}>亮度</Text></View>
+                    <View style={[styles.fontSetContent]}>
+                        { this.renderSlider() }
+                    </View>
+                </View>
+
                 <View style={styles.readerFooterSBRow}>
                     <View style={[styles.titleFont]}><Text style={comFontStyles}>字号</Text></View>
                     <View style={[styles.fontSetContent]}>
@@ -1020,6 +1368,11 @@ class Reader extends BaseComponent<Props, State>{
                         >
                             <Text style={[Fonts.fontFamily,Fonts.fontSize15,Colors.white_FFF]}>A -</Text>
                         </TouchableOpacity>
+                        <View style={[styles.fontWordNumber, Styles.flexCenter]}>
+                            <Text style={[Fonts.fontFamily, Fonts.fontSize12, Colors.white_FFF]}>
+                                { parseInt(this.state.fontSize) }
+                            </Text>
+                        </View>
                         <TouchableOpacity
                             onPress={() => this.fontSizeControl('add')}
                             activeOpacity={1}
@@ -1095,7 +1448,6 @@ class Reader extends BaseComponent<Props, State>{
             fontLineHeight = moderateScale(30);
         }
 
-
         // 板式2
         if(index === 1){
             fontLineHeight = moderateScale(36);
@@ -1107,28 +1459,52 @@ class Reader extends BaseComponent<Props, State>{
         }
 
         this.setState({fontLineHeight, plateTypeIndex: index});
-        this._fontAndPlateSet(this.state.fontSize, fontLineHeight);
+        this._commonReaderStyle(this.state.fontSize, fontLineHeight, this.state);
 
         // 本地缓存
         commonSave && commonSave('plateSet',{fontLineHeight, plateTypeIndex: index});
     }
-    // 字体设置后重新排版 - function
-    _fontAndPlateSet(fontSize, fontLineHeight){
-        const { article } = this.props;
-        const chapter = article && article.chapter;
-        const content = article && article.content;
-        const sourceSiteIndex = chapter && chapter.sourceSiteIndex;
-        const title = chapter && chapter.title;
+    _commonReaderStyle(fontSize, fontLineHeight, data, beginState?: boolean = false){
+        let chapterContentArr = data.chapterContentArr;
+        let chapterHexIdArr = data.chapterHexIdArr;
+        let chapterIndexArr = data.chapterIndexArr;
+        let chapterTitleArr = data.chapterTitleArr;
+        let _arr = [], _content = [];
 
-        let obj = this._formatChapter(content, sourceSiteIndex, title, fontSize, fontLineHeight);
-
-        if(obj.length === 0){
+        if(chapterContentArr.length === 0 && !beginState){
             return infoToast && infoToast('本章未显示文字内容，无法改变字体大小');
         }
 
-        this.pages = obj.length;
+        chapterContentArr.map((chapterContent, index) => {
+            let chapterContentArr = contentFormat(chapterContent, fontSize, fontLineHeight);
+
+            _arr.push({
+                chapterContent: chapterContentArr,
+                chapterTitle: chapterTitleArr[index],
+                chapterHexId: chapterHexIdArr[index],
+                chapterIndex: chapterIndexArr[index],
+            });
+        });
+
+        _arr.forEach((element, index) => {
+             element.chapterContent.forEach((innerElement, innerIndex) => {
+                 _content.push({
+                     title: element.chapterTitle,
+                     num: element.chapterIndex,
+                     content: innerElement,
+                     index: innerIndex + 1,
+                     length: element.chapterContent.length,
+                     result: null,
+                     currentChapterHexId: element.chapterHexId,
+                 });
+             });
+        });
+
+        // console.log('字体设置_content', _content);
+
+        this.pages = _content.length;
         this.count = (this.pages - 1) * width;
-        this.setState({content: obj});
+        this.setState({content: _content, forward: true});
     }
     // 阅读板式的线 - function
     _line(numbers, backgroundColor){
@@ -1318,6 +1694,10 @@ class Reader extends BaseComponent<Props, State>{
 }
 
 const styles = ScaledSheet.create({
+    fontWordNumber: {
+        height: '30@vs',
+        width: '30@s',
+    },
     batteryLevelBox:{
         height: '10@vs',
         width: '22@s',
@@ -1417,9 +1797,9 @@ const styles = ScaledSheet.create({
         flexDirection:'row',
     },
     readerHeaderRmb: {
-        // height: '44@vs',
-        height: '58@vs',
-        paddingTop: '14@vs',
+        height: '44@vs',
+        // height: '58@vs',
+        // paddingTop: '14@vs',
         position: 'absolute',
         top: 0,
         right: 0,
@@ -1521,7 +1901,8 @@ const styles = ScaledSheet.create({
     },
     readerFooterSBRow: {
         paddingLeft: '15@ms',
-        paddingRight: '55@ms',
+        // paddingRight: '55@ms',
+        paddingRight: '40@ms',
         flexDirection: 'row',
         height: '60@vs',
     },
@@ -1544,16 +1925,16 @@ const styles = ScaledSheet.create({
     readerHeaderSetBar: {
         position: 'absolute',
         width: width,
-        // height: '44@vs',
-        height: '58@vs',
-        paddingTop: '14@vs',
+        height: '44@vs',
+        // height: '58@vs',
+        // paddingTop: '14@vs',
         left: 0,
         zIndex: 100,
     },
     readerHeaderReturn: {
-        // height: '44@vs',
-        height: '58@vs',
-        paddingTop: '14@vs',
+        height: '44@vs',
+        // height: '58@vs',
+        // paddingTop: '14@vs',
         width: width / 3,
         position: 'absolute',
         left: 0,
@@ -1618,28 +1999,20 @@ const mapStateToProps = (state, ownProps) => {
     // let vipObj = state.getIn(['local','vip']);
     let myData = state.getIn(['user', 'userData','myData']);
     let userData = state.getIn(['user','userData','baseInfo']);
+    let readerObj = state.getIn(['local','reader']);
 
     if(Immutable.Map.isMap(localData)){ localData = localData.toJS() }
     if(Immutable.Map.isMap(data)){ data = data.toJS() }
     // if(Immutable.Map.isMap(vipObj)){ vipObj = vipObj.toJS() }
     if(Immutable.Map.isMap(myData)){ myData = myData.toJS() }
     if(Immutable.Map.isMap(userData)){ userData = userData.toJS() }
+    if(Immutable.Map.isMap(readerObj)){ readerObj = readerObj.toJS() }
 
-    return { ...ownProps, ...data, ...localData, ...myData, ...userData };
+    return { ...ownProps, ...data, ...localData, ...myData, ...userData, ...readerObj };
 };
 
-export default withNavigationFocus(connect(mapStateToProps,{getChapter, addComments, updateChapter})(Reader));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+export default withNavigationFocus(connect(mapStateToProps,{
+    getChapter, addComments,
+    updateChapter, readerPosition,
+    lightChapterTitle
+})(Reader));

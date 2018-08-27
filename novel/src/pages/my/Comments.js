@@ -1,22 +1,34 @@
 
 'use strict';
 
-import React,{ Component } from 'react';
-import { View  } from 'react-native';
+import React,{ Component, PureComponent } from 'react';
+import { View, Text, StatusBar } from 'react-native';
 import Immutable from 'immutable';
 import { connect } from 'react-redux';
-import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { Styles, ScaledSheet, BackgroundColor } from "../../common/Style";
 import Header from '../../components/Header';
-import { timestampToTime } from "../../common/Tool";
+import { height, timestampToTime, width } from "../../common/Tool";
 import CommentRows from '../../components/CommentRows';
 import { reloadMyComments, loadMyComments } from "../../actions/User";
 import NovelFlatList from '../../components/NovelFlatList';
 import { RefreshState, pixel } from "../../common/Tool";
+import { verticalScale } from "react-native-size-matters";
+import DefaultDisplay from '../../components/DefaultDisplay';
 
-type Props = {};
+type Props = {
+    records: Array<any>,
+    currentOffset: number,
+    refreshState: number,
+    totalRecords: number
+};
 
 class Comments extends Component<Props>{
+    static defaultProps = {
+        records: [],
+        currentOffset: 0,
+        refreshState: 0,
+        totalRecords: 0,
+    };
     constructor(props){
         super(props);
         this.state = {
@@ -57,7 +69,7 @@ class Comments extends Component<Props>{
     onHeaderRefresh(refreshState){
         const { reloadMyComments } = this.props;
 
-        reloadMyComments && reloadMyComments(refreshState,0);
+        reloadMyComments && reloadMyComments(refreshState, 0);
     }
     // 底部加载 - function
     onFooterRefresh(refreshState){
@@ -68,12 +80,18 @@ class Comments extends Component<Props>{
     }
     // 内容 - demo
     renderContent(){
-        let { currentOffset, refreshState, totalRecords } = this.props;
-        let records = this.props.records ? this.props.records : [];
+        const { currentOffset, refreshState, totalRecords, records } = this.props;
+        const _height =  height - (StatusBar.currentHeight + verticalScale(44));
 
         return (
             <NovelFlatList
+                showArrow={true}
                 data={records}
+                ListEmptyComponent={
+                    <View style={[{height: _height, width: width}]}>
+                        <DefaultDisplay />
+                    </View>
+                }
                 renderItem={this.renderItemBooks.bind(this)}
                 keyExtractor={(item,index) => index + ''}
                 onHeaderRefresh={this.onHeaderRefresh.bind(this)}
@@ -96,6 +114,10 @@ class Comments extends Component<Props>{
 }
 
 const styles = ScaledSheet.create({
+    deleteButton:{
+        backgroundColor: 'red',
+        flex: 1
+    },
     separator: {
         backgroundColor: '#E5E5E5',
         width: '100%',

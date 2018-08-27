@@ -52,71 +52,73 @@ class SecondCate extends Component<Props>{
     // 头部 - demo
     renderHeader(){
         const { navigation } = this.props;
-        const item = navigation.getParam('item');
-        const m = this.textControl(item[0].maleFemale);
+        console.log('33333',navigation.state.params);
+        const index = navigation.state.params.index;
+        const item = navigation.state.params.item[index].categoryName;
+        //const m = this.textControl(item[0].maleFemale);
 
         return (
             <Header
                 isTitleRight={true}
-                title={m || ''}
+                title={item}
                 isArrow={true}
                 goBack={this._goBack.bind(this)}
             />
         );
     }
-    textControl(text: string){
-        let k = '';
-
-        switch (text){
-            case 'female': k = '女频';
-                break;
-
-            case 'male' : k = '男频';
-                break;
-        }
-
-        return k;
-    }
+    // textControl(text: string){
+    //     let k = '';
+    //
+    //     switch (text){
+    //         case 'female': k = '女频';
+    //             break;
+    //
+    //         case 'male' : k = '男频';
+    //             break;
+    //     }
+    //
+    //     return k;
+    // }
     // 导航切换 - function
-    cateSwitchMenu(index){
-        const { reloadClassification, navigation } = this.props;
-        const item = navigation.getParam('item');
-
-        this.setState({currentIndex: index});
-        navigation && navigation.setParams({index: index});
-        reloadClassification && reloadClassification(item[index].id, RefreshState.HeaderRefreshing, 0);
-    }
+    // cateSwitchMenu(index){
+    //     const { reloadClassification, navigation } = this.props;
+    //     const item = navigation.getParam('item');
+    //
+    //     this.setState({currentIndex: index});
+    //     navigation && navigation.setParams({index: index});
+    //     reloadClassification && reloadClassification(item[index].id, RefreshState.HeaderRefreshing, 0);
+    // }
     // 头部内容 - demo
-    listHeaderComponent(){
-        const { navigation } = this.props;
-        const item = navigation.getParam('item') || [];
-
-        return (
-            <View style={[styles.navView]}>
-                <View style={styles.menuRow}>
-                    <View style={[styles.menuInner, Styles.marginHorizontal15]}>
-                        {
-                            item.map((item,index) => {
-                                const color = this.state.currentIndex === index ? Colors.orange_f3916b : Colors.gray_808080;
-
-                                return (
-                                    <TouchableOpacity
-                                        activeOpacity={0.75}
-                                        key={index}
-                                        onPress={this.cateSwitchMenu.bind(this, index)}
-                                    >
-                                        <View style={[styles.menuBox, Styles.flexCenter, {width: scale((width - 30) / 4)}]}>
-                                            <Text style={[Fonts.fontFamily, Fonts.fontSize12, color]}>{ item.categoryName || '' }</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            })
-                        }
-                    </View>
-                </View>
-            </View>
-        );
-    }
+    // listHeaderComponent(){
+    //     const { navigation } = this.props;
+    //     const item = navigation.getParam('item') || [];
+    //
+    //     return (
+    //         <View style={[styles.navView]}>
+    //             <View style={styles.menuRow}>
+    //                 <View style={[styles.menuInner, Styles.marginHorizontal15]}>
+    //                     {
+    //                         item.map((item,index) => {
+    //                             const color = this.state.currentIndex === index ? Colors.orange_f3916b : Colors.gray_808080;
+    //
+    //                             return (
+    //                                 <TouchableOpacity
+    //                                     activeOpacity={0.75}
+    //                                     key={index}
+    //                                     onPress={this.cateSwitchMenu.bind(this, index)}
+    //                                 >
+    //                                     <View style={[styles.menuBox, Styles.flexCenter, {width: scale((width - 30) / 4)}]}>
+    //                                         <Text style={[Fonts.fontFamily, Fonts.fontSize12, color]}>{ item.categoryName || '' }</Text>
+    //                                     </View>
+    //                                 </TouchableOpacity>
+    //                             );
+    //                         })
+    //                     }
+    //                 </View>
+    //             </View>
+    //         </View>
+    //     );
+    // }
     // 内容 - demo
     renderContent(){
         const { currentOffset, refreshState, totalRecords } = this.props;
@@ -126,7 +128,7 @@ class SecondCate extends Component<Props>{
             <NovelFlatList
                 //getItemLayout={(data, index) => ({length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index})}
                 data={records}
-                ListHeaderComponent={this.listHeaderComponent.bind(this)}
+                //ListHeaderComponent={this.listHeaderComponent.bind(this)}
                 renderItem={this.renderItemBooks.bind(this)}
                 keyExtractor={(item, index) => index + ''}
                 onHeaderRefresh={this.onHeaderRefresh.bind(this)}
@@ -135,6 +137,7 @@ class SecondCate extends Component<Props>{
                 numColumns={1}
                 totalRecords={totalRecords}
                 offset={currentOffset}
+                showArrow={true}
                 contentContainerStyle={styles.contentContainerStyle}
             />
         );
@@ -143,7 +146,8 @@ class SecondCate extends Component<Props>{
     renderItemBooks({item, index}) {
         const comFontStyles = [Fonts.fontFamily, Fonts.fontSize12, Colors.gray_808080];
         const uri = loadImage && loadImage(item.id);
-
+        const description=item.description ? item.description : '暂无描述';
+        const Description = /<br\s*\/?>/gi.test(description) ? description.replace(/<br\s*\/?>/gi,"") : description;
         return (
             <TouchableOpacity
                 activeOpacity={0.75}
@@ -156,13 +160,10 @@ class SecondCate extends Component<Props>{
                             <Text style={[styles.BookMarkTitle, Fonts.fontFamily, Fonts.fontSize15, Colors.gray_404040]} numberOfLines={1}>
                                 { item.title }
                             </Text>
-                            <View style={[styles.BookMarkNew, Styles.marginRight15]}>
-                                <View style={{marginRight: moderateScale(5)}}>
-                                    <Text style={comFontStyles}>最新章节</Text>
-                                </View>
-                                <View style={{maxWidth:193}}>
-                                    <Text style={comFontStyles} numberOfLines={1}>
-                                        { item.latestChapter ? item.latestChapter.title : ''}
+                            <View style={[styles.BookMarkNew, Styles.marginRight15 ]}>
+                                <View style={{maxWidth:230}}>
+                                    <Text style={comFontStyles} numberOfLines={2}>
+                                        { Description ? Description : ''}
                                     </Text>
                                 </View>
                             </View>

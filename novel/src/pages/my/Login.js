@@ -123,7 +123,7 @@ class Login extends Component<Props>{
             <View style={[Styles.container, {backgroundColor: BackgroundColor.bg_fff}]}>
                 <View style={[styles.jumpOverIndex]}>
                     <TouchableOpacity  activeOpacity={0.70} onPress={this.jumpOver.bind(this)}>
-                        <Text style={[Fonts.fontSize15,Colors.gray_404040]}>跳过</Text>
+                        <Text style={[Fonts.fontSize15,Colors.gray_404040]}>关闭</Text>
                     </TouchableOpacity>
                 </View>
                 <View style={[styles.imageView, Styles.flexCenter]}>
@@ -184,7 +184,7 @@ const styles = ScaledSheet.create({
     jumpOverIndex:{
        flexDirection:'row',
        justifyContent:'flex-end',
-       marginTop:'25@ms',
+       marginTop:'35@ms',
        marginRight:'15@ms'
     }
 });

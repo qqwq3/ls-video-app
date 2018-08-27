@@ -44,9 +44,32 @@ export const isVip = (status: any) => (dispatch: Dispatch, getState: GetState) =
     return dispatch(_isVip(status));
 };
 
+const _readerPosition = (value): ThunkAction => ({
+    params: {
+        stateKeys: ['reader'],
+        value: value
+    },
+    type: 'CHANGE_READER_POSITION_LOCAL',
+});
 
+// 改变阅读偏移
+export const readerPosition = (value: Number) => (dispatch: Dispatch, getState: GetState) => {
+    return dispatch(_readerPosition(value));
+};
 
+const _lightChapterTitle = (content, index): ThunkAction => ({
+    params: {
+        stateKeys: ['chapterTitle'],
+        content: content,
+        index: index,
+    },
+    type: 'CHAPTER_NAME_LIGHT_LOCAL',
+});
 
+// 点亮章节标题
+export const lightChapterTitle = (content: Array<any>, index: number) => (dispatch: Dispatch, getState: GetState) => {
+    return dispatch(_lightChapterTitle(content, index));
+};
 
 
 

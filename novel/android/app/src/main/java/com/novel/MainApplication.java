@@ -7,6 +7,7 @@ import com.example.qiepeipei.react_native_clear_cache.ClearCachePackage;
 import com.ninty.system.setting.SystemSettingPackage;
 
 import com.meituan.android.walle.WalleChannelReader;
+
 import com.microsoft.codepush.react.CodePush;
 
 import com.rnfs.RNFSPackage;
@@ -37,10 +38,10 @@ public class MainApplication extends Application implements ReactApplication {
 
   private final ReactNativeHost mReactNativeHost = new ReactNativeHost(this) {
 
-        @Override
-        protected String getJSBundleFile() {
+    @Override
+    protected String getJSBundleFile() {
         return CodePush.getJSBundleFile();
-        }
+    }
     
     @Override
     public boolean getUseDeveloperSupport() {
@@ -53,7 +54,10 @@ public class MainApplication extends Application implements ReactApplication {
           new MainReactPackage(),
             new ClearCachePackage(),
             new SystemSettingPackage(),
-            new CodePush(null, getApplicationContext(), BuildConfig.DEBUG),
+
+            new CodePush(BuildConfig.CODEPUSH_KEY, MainApplication.this, BuildConfig.DEBUG),
+            // new CodePush(getResources().getString(R.string.reactNativeCodePush_androidDeploymentKey), getApplicationContext(), BuildConfig.DEBUG),
+
             new RNFSPackage(),
             new RNAppUpdatePackage(),
             new CookieManagerPackage(),

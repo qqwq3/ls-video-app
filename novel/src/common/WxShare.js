@@ -17,6 +17,7 @@ export const commonShare = async (
     agentTag:string,
     title?: string = '小说天堂-全网免费看',
     contentText?: string = '免费看全网书籍，还能赚大钱。强烈推荐！',
+    link: string,
 ) => {
     const shareBody = contentText;
     const shareTitle = title;
@@ -26,7 +27,7 @@ export const commonShare = async (
     const user = await loadUserSession();
     const userId = (user && user.id) || '';
     //http://192.168.188.157:82/share/index.html
-    const shareLink: string = `${shareUrl}/share/index.html?channelId=${channelID}&agentTag=${agentTag}&user_id=${userId}`;
+    const shareLink: string = link ? link :`${shareUrl}/share/index.html?channelId=${channelID}&agentTag=${agentTag}&user_id=${userId}`;
 
     shareContent(type,shareTitle,shareBody,shareImageUrl,shareLink);
 };
@@ -95,100 +96,3 @@ export const shareRemoveListener = () => {
     weChat.removeAllListeners();
 };
 
-
-//-------------------------- old  public --------------------------------//
-
-/**
- * 分享文本给好友
- * @param description
- */
-export function shareFdsText(description:string){
-    weChat.registerApp(wxId);
-    weChat.isWXAppInstalled()
-        .then((isInstalled) => {
-            if (isInstalled) {
-                weChat.shareToSession({type: 'text', description: description})
-                    .catch((error) => {
-                        Toast.show(error.message);
-                    });
-            } else {
-                Toast.show('没有安装微信软件，请您安装微信之后再试',{duration: 2000, position: -55});
-            }
-        });
-}
-
-/**
-* 分享链接给朋友
-* @param title  题目
-* @param description 描述
-* @param thumbImage  图片地址
-* @param webpageUrl  链接路径
-*/
-export function shareFdsLink(title?: any,description?: any,thumbImage?: any,webpageUrl?: any){
-    weChat.registerApp(wxId);
-    weChat.isWXAppInstalled()
-        .then((isInstalled) => {
-            if (isInstalled) {
-                weChat.shareToSession({
-                    title:title,
-                    description: description,
-                    thumbImage: thumbImage,
-                    type: 'news',
-                    webpageUrl:webpageUrl
-                })
-                .catch((error) => {
-                    Toast.show('分享失败，请稍后再次分享哦');
-                });
-            } else {
-                Toast.show('没有安装微信软件，请您安装微信之后再试');
-            }
-        });
-}
-
-
-/**
- * 分享文本到朋友圈
- * @param description  文本文字
- */
-export function shareFdsCirText(description:string){
-    weChat.registerApp(wxId);
-    weChat.isWXAppInstalled()
-        .then((isInstalled) => {
-            if (isInstalled) {
-                weChat.shareToTimeline({type: 'text', description: description})
-                .catch((error) => {
-                    Toast.show(error.message);
-                });
-            } else {
-                Toast.show('没有安装微信软件，请您安装微信之后再试');
-            }
-        });
-}
-
-/**
- * 分享链接到朋友圈
- * @param title  题目
- * @param description 描述
- * @param thumbImage  图片地址
- * @param webpageUrl  链接路径
- */
-export function shareFdsCirLink(title?: any,description?: any,thumbImage?: any,webpageUrl?: any){
-    weChat.registerApp(wxId);
-    weChat.isWXAppInstalled()
-        .then((isInstalled) => {
-            if (isInstalled) {
-                weChat.shareToTimeline({
-                    title:title,
-                    description: description,
-                    thumbImage: thumbImage,
-                    type: 'news',
-                    webpageUrl: webpageUrl
-                })
-                .catch((error) => {
-                    Toast.show('分享失败，请稍后再次分享哦');
-                });
-            } else {
-                Toast.show('没有安装微信软件，请您安装微信之后再试');
-            }
-        });
-}

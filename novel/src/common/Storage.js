@@ -36,6 +36,48 @@ export const commonRemove = async (ID: string) => {
 };
 
 
+/*-----公共方法 - 保存 - 读取 - 删除-----*/ /*--- 包含id ---*/
+
+// 保存
+export const fineCommonSave = async (key: string, id: string, data: any) => {
+    try {
+        return await storage.save({key: key, id: id, data: data});
+    }
+    catch (err) {
+        return null;
+    }
+}
+
+// 读取
+export const fineCommonLoad = async (key: string, id: string) => {
+    try {
+        return await storage.load({key: key, id: id});
+    }
+    catch (err) {
+        return null;
+    }
+};
+
+// 删除所有
+export const fineCommonRemove = async (key: string) => {
+    try {
+        return await storage.clearMapForKey(key);
+    }
+    catch (err) {
+        return null;
+    }
+};
+
+// 删除单个
+export const fineCommonRemoveSingle = async (key: string, id: string | number) => {
+    try {
+        return await storage.remove({key: key, id: id});
+    }
+    catch (err) {
+        return null;
+    }
+};
+
 
 /**
  * 读取用户会话

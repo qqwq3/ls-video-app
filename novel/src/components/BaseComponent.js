@@ -1,10 +1,11 @@
 'use strict';
 
-import React from 'react';
-import {NavigationActions} from 'react-navigation';
-import {infoToast} from "../common/Tool";
+import React, { Component } from 'react';
+import { NavigationActions } from 'react-navigation';
+import { infoToast } from "../common/Tool";
+import { removeUserSession } from "../common/Storage";
 
-export default class BaseComponent extends React.Component {
+export default class BaseComponent extends Component {
     constructor(props){
         super(props);
         this.errTime = Date.now();
@@ -37,10 +38,17 @@ export default class BaseComponent extends React.Component {
                 if(this.isRedirect401()) {
                     return this.logIn();
                 }
-                return infoToast("请先登录");
+
+                // 清除用户信息 - 本地
+                removeUserSession && removeUserSession();
+
+                // 清除redux相关的缓存
+                global.persistStore && global.persistStore.purge();
+
+                return infoToast(nextData.error.message);
             }
+
             // 显示错误
-            //Toast.show(nextData.error.message);
             infoToast(nextData.error.message);
         }
 
@@ -55,19 +63,15 @@ export default class BaseComponent extends React.Component {
     isRedirect401() {
         return false;
     }
-
     ignoreErrorCodes() {
         return [];
     }
-
     getData(props) {
         return props;
     }
-
     logIn = () => {
         this.props.navigation && this.props.navigation.navigate('logIn');
     };
-
     backNavigate = (routeName: string, params: Object = undefined) => {
         this.props.navigation && this.props.navigation.dispatch({
             type: 'BACK',

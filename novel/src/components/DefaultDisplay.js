@@ -4,6 +4,7 @@
 import React,{ PureComponent } from 'react';
 import { Text, View, Image } from 'react-native';
 import { Styles, ScaledSheet, Img, Fonts, Colors } from "../common/Style";
+import { def } from "../common/Icons";
 
 type Props = {
     backgroundColor: ?string,
@@ -20,6 +21,7 @@ type State = {};
 
 class DefaultDisplay extends PureComponent<Props, State>{
     static defaultProps = {
+        source: def.noData,
         backgroundColor: '#FFFFFF',
         imageStyle: {},
         showText: false,
@@ -41,8 +43,8 @@ class DefaultDisplay extends PureComponent<Props, State>{
 
         return (
             !showText ?
-            <View style={[Styles.container, {backgroundColor: backgroundColor}]}>
-                <Image source={source} style={[Img.resizeModeContain, imageStyle]} />
+            <View style={[Styles.container, {backgroundColor: backgroundColor}, styles.box, Styles.flexCenter]}>
+                <Image source={source} style={[Img.resizeModeContain, imageStyle, styles.img]} />
             </View> :
             <View style={TextContentStyle}>
                 <Text style={[Fonts.fontFamily, textSize, textColor]}>{ text }</Text>
@@ -52,7 +54,12 @@ class DefaultDisplay extends PureComponent<Props, State>{
 }
 
 const styles = ScaledSheet.create({
-
+    box: {
+        flex: 1
+    },
+    img: {
+        width: '60@s',
+    },
 });
 
 export default DefaultDisplay;

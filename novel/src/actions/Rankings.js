@@ -18,12 +18,12 @@ const _loadRandKing = (sort_by): ThunkAction => ({
 
 // 获取书城首页
 export const loadRandKing = (sort_by: string) => (dispatch: Dispatch, getState: GetState) => {
-    const state = getState && getState();
-    const data = state.getIn(['rankings', 'main', humps.camelize(sort_by)]);
+    // const state = getState && getState();
+    // const data = state.getIn(['rankings', 'main', humps.camelize(sort_by)]);
 
-    if(data !== undefined){
-        return;
-    }
+    // if(data !== undefined){
+    //     return;
+    // }
 
     return dispatch(_loadRandKing(sort_by));
 };

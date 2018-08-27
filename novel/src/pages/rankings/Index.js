@@ -6,6 +6,7 @@ import { View, Text, TouchableOpacity, Image, ScrollView, FlatList} from 'react-
 import Immutable from 'immutable';
 import humps from 'humps';
 import { connect } from 'react-redux';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { Styles, ScaledSheet, Img, Fonts, Colors } from "../../common/Style";
 import TabBarIcon from '../../components/TabBarIcon';
 import { tab, fontImage, rankings } from "../../common/Icons";
@@ -195,11 +196,11 @@ class Rankings extends Component<Props>{
 
                     <View style={[styles.bookSectionBase]}>
                         <View style={styles.basic}>
-                            <Text numberOfLines={1} style={[{flex:1}, Fonts.fontSize12, Colors.gray_808080]}>{ item.authorName || '' }</Text>
-                            <Text numberOfLines={1} style={[{flex:1}, Fonts.fontSize12, Colors.gray_808080]}>{ item.categoryName || '' }</Text>
+                            <Text numberOfLines={1} style={[ Fonts.fontSize12, Colors.gray_808080]}>{ item.authorName || '' }</Text>
                         </View>
                         <View style={styles.ready}>
-                            <Text numberOfLines={1} style={[Fonts.fontSize12, Colors.gray_808080]}>{ numberConversion(item.totalLikes || 0) }</Text>
+                            <Text numberOfLines={1} style={[ {fontSize:scale(9),color:'#EEC591',borderWidth:scale(1),borderRadius:moderateScale(3),borderColor:'#EEC591',textAlign:'center',lineHeight:verticalScale(20),marginRight:moderateScale(5),width:scale(40)}]}>{ item.categoryName || '' }</Text>
+                            <Text numberOfLines={1} style={[{fontSize:scale(9),color:'#DDDDDD',borderWidth:scale(1),borderRadius:moderateScale(3),borderColor:'#DDDDDD',textAlign:'center',lineHeight:verticalScale(20),width:scale(40)}]}>{ numberConversion(item.totalLikes || 0) }</Text>
                         </View>
                     </View>
 
@@ -208,6 +209,7 @@ class Rankings extends Component<Props>{
                             { item.description === '' ? '暂无描述' : Description }
                         </Text>
                     </View>
+
                 </View>
             </TouchableOpacity>
         );

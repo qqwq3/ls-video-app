@@ -2,7 +2,7 @@
 'use strict';
 
 import { combineReducers } from 'redux-immutable';
-
+// import { reducer as network } from 'react-native-offline';
 import user from './User';
 import bookshelf from './Bookshelf';
 import classification from './Classification';
@@ -16,17 +16,10 @@ import chapterDirectory from './ChapterDirectory';
 import local from './LocalReducer';
 
 const rootReducer = combineReducers({
-    user,
-    bookshelf,
-    classification,
-    rankings,
-    bookCity,
-    feedback,
-    reader,
-    sexSelection,
-    details,
-    chapterDirectory,
-    local
+    user, bookshelf, classification,
+    rankings, bookCity, feedback,
+    reader, sexSelection, details,
+    chapterDirectory, local,
 });
 
 export default rootReducer;

@@ -27,7 +27,7 @@ class BookComment extends Component<Props, State>{
         this.commentsTime = Date.now();
         this.toastConfig = { duration: 2000, position: Toast.positions.CENTER };
     }
-    componentWillMount() {
+    componentDidMount(){
         setStatusBar && setStatusBar(BackgroundColor.bg_fff, true, 'dark-content');
     }
     componentWillReceiveProps(nextProps){
@@ -49,6 +49,9 @@ class BookComment extends Component<Props, State>{
                 infoToast && infoToast('评论失败' + error.message, this.toastConfig);
             }
         }
+    }
+    componentWillUnmount(){
+        this.setState = () => { return };
     }
     // 返回 - function
     _goBack() {
@@ -84,6 +87,7 @@ class BookComment extends Component<Props, State>{
                     underlineColorAndroid={'transparent'}
                     onChangeText={this._changeText.bind(this)}
                     keyboardType={'default'}
+                    selectionColor={'#f3916b'}
                 />
             </View>
         );
@@ -118,7 +122,7 @@ class BookComment extends Component<Props, State>{
     }
     render(){
         return (
-            <View style={[Styles.container, BackgroundColor.bg_fff]}>
+            <View style={[Styles.container, {backgroundColor: BackgroundColor.bg_fff}]}>
                 { this.renderHeader() }
                 { this.renderInputBox() }
                 { this.renderButton() }

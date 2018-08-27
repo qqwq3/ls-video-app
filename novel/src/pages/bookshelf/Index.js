@@ -2,14 +2,12 @@
 'use strict';
 
 import React,{ Component } from 'react';
-import { View, Text, TouchableOpacity, Image, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, Image, TouchableWithoutFeedback, BackHandler, Platform } from 'react-native';
 import Immutable from 'immutable';
-// import ImageLoad from 'react-native-image-placeholder';
 import Carousel from 'react-native-banner-carousel';
-// import AppMetadata from 'react-native-app-metadata';
 import { withNavigationFocus } from 'react-navigation';
 import { connect } from 'react-redux';
-import { moderateScale } from 'react-native-size-matters';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { Styles, ScaledSheet, Img, Fonts, Colors, BackgroundColor } from "../../common/Style";
 import TabBarIcon from '../../components/TabBarIcon';
 import { reloadBookshelf, loadBookshelf, singleBookDel, batchBookDel } from "../../actions/Bookshelf";
@@ -18,12 +16,17 @@ import { fontImage, def, bookshelf, tab, agent, mix } from "../../common/Icons";
 import Chrysanthemum from '../../components/Chrysanthemum';
 import ImageAndFonts from '../../components/ImageAndFonts';
 import Books from '../../components/Books';
+import NovelFlatList from '../../components/NovelFlatList';
+import { width, height, loadImage, RefreshState, infoToast, setStatusBar } from "../../common/Tool";
+import { updateBookshelf } from '../../actions/LocalAction';
+import { SubmitApply, deleteUserData } from "../../actions/User";
+import Dialog from '../../components/Dialog';
+import BaseComponent from "../../components/BaseComponent";
+// import { withNetworkConnectivity } from 'react-native-offline';
+// import ImageLoad from 'react-native-image-placeholder';
+// import AppMetadata from 'react-native-app-metadata';
 // import { CHANNEL_KEY } from "../../common/Keys";
 // import * as api from '../../common/Api';
-import NovelFlatList from '../../components/NovelFlatList';
-import { width, loadImage, RefreshState, infoToast } from "../../common/Tool";
-import { updateBookshelf } from '../../actions/LocalAction';
-import { SubmitApply } from "../../actions/User";
 
 type Props = {
     records: ?Array<any>,
@@ -31,7 +34,7 @@ type Props = {
     currentOffset: number,
 };
 
-class Bookshelf extends Component<Props>{
+class Bookshelf extends BaseComponent<Props>{
     static defaultProps = {
         records: [],
         refreshState: 0,
@@ -53,24 +56,42 @@ class Bookshelf extends Component<Props>{
         this.state = {
             delMap: new Map(),
             records: [],
+            isShow:false,
         };
         this.deleteTiem = Date.now();
         this.updateTime = Date.now();
         this.bannerArr = [
             {
-                cover: require('../../images/banner/banner1.png'),
-                title: 'banner1'
+                cover: require('../../images/banner/banner3.png'),
+                title: 'banner3'
             },
-            {
-                cover: require('../../images/banner/banner2.png'),
-                title: 'banner2'
-            }
+
         ];
     }
     componentDidMount() {
+        this.props.loadScopeAndState && this.props.loadScopeAndState();
+        // 设备返回键监听
+        this._addEventListenerBackHandler();
+
+        if(global.launchSettings && global.launchSettings.isClear){
+            // 清除用户本地props的相关信息
+            this.props.deleteUserData && this.props.deleteUserData();
+        }
+
+        if(!this.isAuthorized()){
+            this.setState({
+                isShow:true
+            })
+        }
+
         this.onHeaderRefresh && this.onHeaderRefresh(RefreshState.HeaderRefreshing);
     }
+
     componentWillReceiveProps(nextProps) {
+        super.componentWillReceiveProps(nextProps);
+
+        // console.log('bookshelf - componentWillReceiveProps', nextProps);
+
         // 书架删除
         if(nextProps.delete){
             const code = nextProps.delete.code;
@@ -84,6 +105,11 @@ class Bookshelf extends Component<Props>{
 
         // 进入本组件
         if(!this.props.isFocused && nextProps.isFocused){
+            if(this.isAuthorized()){
+                this.setState({
+                    isShow:false
+                })
+            }
             // 添加书架成功后返回本节目执行刷新操作
             if(nextProps.addBookshelfStatus && nextProps.addBookshelfStatus.status){
                 const { updateBookshelf } = nextProps;
@@ -91,43 +117,109 @@ class Bookshelf extends Component<Props>{
                 this.onHeaderRefresh && this.onHeaderRefresh(RefreshState.HeaderRefreshing);
                 updateBookshelf && updateBookshelf(false);
             }
+
+            // 设备返回键监听
+            this._addEventListenerBackHandler();
         }
 
         // 离开本组件
         if(this.props.isFocused && !nextProps.isFocused){
-
+            // 删除返回键监听
+            this._removeEventListenerBackHandler();
         }
 
         // 代理
-        if(nextProps && nextProps.applyAgentTimeUpdated > this.updateTime && nextProps.messageKeys && nextProps.messageKeys === 'bookshelf'){
-            this.updateTime = Date.now();
-            let applyState = parseInt(nextProps.state);
-
-            if (applyState === 1) {
-                const { navigation } = nextProps;
-                return navigation && navigation.navigate('AgentHtml',
-                    {agent: {loginStatus : nextProps.loginStatus, agentAdminUrl : nextProps.agentAdminUrl}});
-            }
-            else if (applyState === 2) {
-                return infoToast("您的账号出了点问题，请联系客服");
-            }
-            else if (applyState === 3) {
-                return infoToast("申请中，请耐心等待");
-            }
-            else {
-                return infoToast("您还不是代理");
-            }
+        // if(nextProps && nextProps.applyAgentTimeUpdated > this.updateTime && nextProps.messageKeys && nextProps.messageKeys === 'bookshelf'){
+        //     this.updateTime = Date.now();
+        //     let applyState = parseInt(nextProps.state);
+        //
+        //     if (applyState === 1) {
+        //         const { navigation } = nextProps;
+        //         return navigation && navigation.navigate('AgentHtml',
+        //             {agent: {loginStatus : nextProps.loginStatus, agentAdminUrl : nextProps.agentAdminUrl}});
+        //     }
+        //     else if (applyState === 2) {
+        //         return infoToast("您的账号出了点问题，请联系客服");
+        //     }
+        //     else if (applyState === 3) {
+        //         return infoToast("申请中，请耐心等待");
+        //     }
+        //     else {
+        //         return infoToast("您还不是代理");
+        //     }
+        // }
+    }
+    componentWillUnmount(){
+        // 删除返回键监听
+        this._removeEventListenerBackHandler();
+    }
+    // 监听设备返回键 - function
+    _addEventListenerBackHandler(){
+        // 安卓设备
+        if(Platform.OS === 'android'){
+            this.appBackHandler = BackHandler.addEventListener('hardwareBackPress', this._handleBack.bind(this));
         }
+        // 苹果设备 - 临时处理
+        else{
+
+        }
+    }
+    // 删除监听 - function
+    _removeEventListenerBackHandler(){
+        // 安卓设备
+        if(Platform.OS === 'android'){
+            this.appBackHandler && this.appBackHandler.remove();
+        }
+        // 苹果设备 - 临时处理
+        else{
+
+        }
+    }
+    // 立即退出 - function
+    onDismissExit(){
+        if(Platform.OS === 'android'){
+            BackHandler.exitApp();
+        }
+        this.popExitRef && this.popExitRef.modeHide();
+    }
+    // 想再看看 - function
+    onConfirmExit(){
+        this.popExitRef && this.popExitRef.modeHide();
+    }
+    // 退出提示 - demo
+    renderLogout(){
+        return (
+            <Dialog
+                popHeight={verticalScale(180)}
+                ref={ref => this.popExitRef = ref}
+                animationType={'slide'}
+                title={'系统提示'}
+                buttonLeftText={'立即退出'}
+                buttonRightText={'想再看看'}
+                mandatory={true}
+                onDismiss={this.onDismissExit.bind(this)}
+                onConfirm={this.onConfirmExit.bind(this)}
+            >
+                <View style={[Styles.flexCenter, Styles.flex1]}>
+                    <Text style={[Fonts.fontSize15, Fonts.fontFamily, Colors.gray_404040]}>亲，确定要退出小说天堂吗？</Text>
+                </View>
+            </Dialog>
+        );
+    }
+    // 设备返回键监听对应函数 - function
+    _handleBack(){
+        this.popExitRef && this.popExitRef.modeShow();
+        return true;
     }
     // 搜索
     _search(){
         const { navigation } = this.props;
-        navigation.navigate('SearchEngines');
+        navigation && navigation.navigate('SearchEngines');
     }
     // 签到
     _signIn(){
         const { navigation } = this.props;
-        navigation.navigate('SignIn');
+        navigation && navigation.navigate('SignIn');
     }
     // 头部 - demo
     renderHeader(){
@@ -150,10 +242,10 @@ class Bookshelf extends Component<Props>{
     }
     // 申请代理 - router
     _ApplyAgent(index){
-        if(index === 0){
-            const { navigation } = this.props;
-            navigation && navigation.navigate('ApplyAgent');
-        }
+        // if(index === 0){
+        //     const { navigation } = this.props;
+        //     navigation && navigation.navigate('ApplyAgent');
+        // }
         if(index===1){
             const { navigation } = this.props;
             navigation && navigation.navigate('ShareBookCurrency');
@@ -324,7 +416,7 @@ class Bookshelf extends Component<Props>{
             <NovelFlatList
                 data={records.concat([{type: 'custom'}])}
                 horizontal={false}
-                ListHeaderComponent={this.listHeaderComponent.bind(this)}
+                // ListHeaderComponent={this.listHeaderComponent.bind(this)}
                 renderItem={this.renderItemBooks.bind(this)}
                 keyExtractor={(item, index) => index + ''}
                 onHeaderRefresh={this.onHeaderRefresh.bind(this)}
@@ -343,8 +435,15 @@ class Bookshelf extends Component<Props>{
     _reader(hexId, bookId){
         const { navigation } = this.props;
         const bookHexId = hexId;
+        const chapterHexId = `book_id${hexId}`;
 
-        navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: true});
+        // navigation && navigation.navigate('Reader',{ hexId, bookId, bookHexId, direct: true});
+
+        navigation && navigation.navigate('Reader',{
+            chapterHexId,
+            bookHexId,
+            bookId
+        });
     }
     // 删除操作栏 - demo
     renderDelete(){
@@ -406,13 +505,44 @@ class Bookshelf extends Component<Props>{
     _agentOnPress(){
         this.props.SubmitApply && this.props.SubmitApply('bookshelf');
     }
+    // 弹窗
+    // renderAlter(){
+    //     if(this.state.isShow){return(
+    //         <View style={{position:'absolute',zIndex:10,backgroundColor: 'rgba(0, 0, 0, 0.5)',width,height,justifyContent:'center',alignItems:'center'}}
+    //         >
+    //             <TouchableOpacity
+    //                 activeOpacity={1}
+    //                 onPress={this._myOnPress.bind(this)}
+    //                 style={{marginBottom:moderateScale(20)}}
+    //             >
+    //                     <Image source={bookshelf.popup} style={{borderRadius:moderateScale(5)}}/>
+    //             </TouchableOpacity>
+    //             <TouchableOpacity
+    //                 activeOpacity={1}
+    //                 onPress={()=>{
+    //                     this.setState({
+    //                         isShow:false,
+    //                     })
+    //                 }}
+    //             >
+    //                 <Image source={bookshelf.close}/>
+    //             </TouchableOpacity>
+    //         </View>
+    //     )}
+    // }
+    // 去我的界面 - function
+    _myOnPress(){
+        const { navigation } = this.props;
+        navigation && navigation.navigate('My')
+    }
     render(){
         return (
             <View style={[Styles.container]}>
                 { this.renderHeader() }
                 { this.renderContent() }
                 { this.renderDelete() }
-                { this.renderAgent() }
+                {/*{ this.renderAgent() }*/}
+                { this.renderLogout() }
             </View>
         );
     }
@@ -546,21 +676,29 @@ const mapStateToProps = (state, ownProps) => {
     let data = state.getIn(['bookshelf','main']);
     let addBookshelfStatus = state.getIn(['local','bookshelf']);
     let agentInfo = state.getIn(['user','userData','applyAgent']);
+    let baseInfo = state.getIn(['user', 'userData','baseInfo']);
+
+    // console.log('bookshelf-mapStateToProps', state.getIn(['network']));
 
     if(Immutable.Map.isMap(agentInfo)){ agentInfo = agentInfo.toJS() }
     if(Immutable.Map.isMap(data)){ data = data.toJS() }
     if(Immutable.Map.isMap(addBookshelfStatus)){ addBookshelfStatus = addBookshelfStatus.toJS() }
+    if(Immutable.Map.isMap(baseInfo)){ baseInfo = baseInfo.toJS() }
 
-    return { ...ownProps, ...data, addBookshelfStatus, ...agentInfo };
+    return {
+        ...ownProps, ...data,
+        addBookshelfStatus, ...agentInfo,
+        ...baseInfo
+    };
 };
 
+// Bookshelf = withNetworkConnectivity({checkInBackground: true})(Bookshelf);
+
 export default withNavigationFocus(connect(mapStateToProps,{
-    reloadBookshelf,
-    loadBookshelf,
-    singleBookDel,
-    batchBookDel,
-    updateBookshelf,
-    SubmitApply
+    reloadBookshelf, loadBookshelf,
+    singleBookDel, batchBookDel,
+    updateBookshelf, SubmitApply,
+    deleteUserData
 })(Bookshelf));
 
 
